@@ -106,16 +106,44 @@ class AlloyDataLoader:
         data['density'] = phys.get('Density_g_cm3', 0)
         data['melting_point'] = phys.get('MeltingPoint_K', 0)
         data['thermal_conductivity'] = phys.get('ThermalConductivity_W_mK', 0)
+        data['thermal_expansion'] = phys.get('ThermalExpansion_per_K', 0)
         data['electrical_resistivity'] = phys.get('ElectricalResistivity_Ohm_m', 0)
         data['specific_heat'] = phys.get('SpecificHeat_J_kgK', 0)
         data['youngs_modulus'] = phys.get('YoungsModulus_GPa', 0)
+        data['shear_modulus'] = phys.get('ShearModulus_GPa', 0)
+        data['poissons_ratio'] = phys.get('PoissonsRatio', 0)
+
+        # Hardness values (multiple scales)
         data['hardness'] = phys.get('BrinellHardness_HB', 0)
+        data['hardness_brinell'] = phys.get('BrinellHardness_HB', 0)
+        data['hardness_vickers'] = phys.get('VickersHardness_HV', 0)
+        data['hardness_rockwell'] = phys.get('RockwellHardness_HRC', 0)
 
         # Mechanical properties
         mech = data.get('MechanicalProperties', {})
         data['tensile_strength'] = mech.get('TensileStrength_MPa', 0)
         data['yield_strength'] = mech.get('YieldStrength_MPa', 0)
         data['elongation'] = mech.get('Elongation_percent', 0)
+        data['reduction_of_area'] = mech.get('ReductionOfArea_percent', 0)
+        data['impact_strength'] = mech.get('ImpactStrength_J', 0)
+        data['fatigue_strength'] = mech.get('FatigueStrength_MPa', 0)
+        data['fracture_toughness'] = mech.get('FractureToughness_MPa_sqrt_m', 0)
+
+        # Corrosion properties
+        corr = data.get('CorrosionResistance', {})
+        data['pren'] = corr.get('PREN', 0) if isinstance(corr, dict) else 0
+        data['pitting_potential'] = corr.get('PittingPotential_mV_SCE', 0) if isinstance(corr, dict) else 0
+        # Corrosion resistance rating (numeric 0-100 scale, or derived from PREN)
+        if isinstance(corr, dict):
+            pren_val = corr.get('PREN', 0)
+            # Convert PREN to 0-100 scale (PREN typically ranges 0-50+)
+            data['corrosion_resistance'] = min(100, pren_val * 2) if pren_val > 0 else 50
+        else:
+            data['corrosion_resistance'] = 50  # Default moderate
+
+        # Economic properties (estimated if not present)
+        econ = data.get('EconomicProperties', {})
+        data['cost_per_kg'] = econ.get('CostPerKg_USD', 0)
 
         # Lattice properties
         lattice = data.get('LatticeProperties', {})

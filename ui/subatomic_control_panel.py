@@ -282,25 +282,65 @@ class SubatomicPropertyControl(QWidget):
         self.parent_panel.on_property_changed(self.property_key, idx)
 
     def _get_subatomic_property_metadata(self, property_name):
-        """Get metadata for subatomic particle properties"""
+        """Get metadata for subatomic particle properties - comprehensive list"""
         metadata_map = {
-            "mass_mevc2": {"min_value": 0, "max_value": 12000, "unit": "MeV/c^2"},
-            "mass": {"min_value": 0, "max_value": 12000, "unit": "MeV/c^2"},
-            "charge_e": {"min_value": -2, "max_value": 2, "unit": "e"},
-            "charge": {"min_value": -2, "max_value": 2, "unit": "e"},
-            "electric_charge": {"min_value": -2, "max_value": 2, "unit": "e"},
-            "spin_hbar": {"min_value": 0, "max_value": 3.5, "unit": "h-bar"},
-            "spin": {"min_value": 0, "max_value": 3.5, "unit": "h-bar"},
-            "baryonnumber_b": {"min_value": -1, "max_value": 1, "unit": "B"},
-            "baryon_number": {"min_value": -1, "max_value": 1, "unit": "B"},
-            "isospin_i3": {"min_value": -1.5, "max_value": 1.5, "unit": "I3"},
-            "isospin": {"min_value": -1.5, "max_value": 1.5, "unit": "I3"},
-            "strangeness": {"min_value": -3, "max_value": 0, "unit": "S"},
-            "half_life": {"min_value": 0, "max_value": 1e-8, "unit": "s"},
-            "half-life": {"min_value": 0, "max_value": 1e-8, "unit": "s"},
-            "stability": {"min_value": 0, "max_value": 1, "unit": ""},
-            "quark_count": {"min_value": 2, "max_value": 3, "unit": ""},
-            "none": {"min_value": 0, "max_value": 100, "unit": ""},
+            # Mass properties
+            "mass_mevc2": {"min_value": 0, "max_value": 12000, "unit": "MeV/c^2", "log_scale": False},
+            "mass": {"min_value": 0, "max_value": 12000, "unit": "MeV/c^2", "log_scale": False},
+            "mass_log_scale": {"min_value": 2.0, "max_value": 4.5, "unit": "log10(MeV)", "log_scale": True},
+
+            # Charge properties
+            "charge_e": {"min_value": -2, "max_value": 2, "unit": "e", "log_scale": False},
+            "charge": {"min_value": -2, "max_value": 2, "unit": "e", "log_scale": False},
+            "electric_charge": {"min_value": -2, "max_value": 2, "unit": "e", "log_scale": False},
+            "electric_charge_e": {"min_value": -2, "max_value": 2, "unit": "e", "log_scale": False},
+
+            # Spin properties
+            "spin_hbar": {"min_value": 0, "max_value": 3.5, "unit": "h-bar", "log_scale": False},
+            "spin": {"min_value": 0, "max_value": 3.5, "unit": "h-bar", "log_scale": False},
+
+            # Baryon/Lepton numbers
+            "baryonnumber_b": {"min_value": -1, "max_value": 1, "unit": "B", "log_scale": False},
+            "baryon_number": {"min_value": -1, "max_value": 1, "unit": "B", "log_scale": False},
+            "baryon_number_b": {"min_value": -1, "max_value": 1, "unit": "B", "log_scale": False},
+            "leptonnumber_l": {"min_value": -1, "max_value": 1, "unit": "L", "log_scale": False},
+            "lepton_number": {"min_value": -1, "max_value": 1, "unit": "L", "log_scale": False},
+            "lepton_number_l": {"min_value": -1, "max_value": 1, "unit": "L", "log_scale": False},
+
+            # Isospin properties
+            "isospin_i": {"min_value": 0, "max_value": 1.5, "unit": "I", "log_scale": False},
+            "isospin_i3": {"min_value": -1.5, "max_value": 1.5, "unit": "I3", "log_scale": False},
+            "isospin": {"min_value": 0, "max_value": 1.5, "unit": "I", "log_scale": False},
+            "isospin_i3": {"min_value": -1.5, "max_value": 1.5, "unit": "I3", "log_scale": False},
+
+            # Flavor quantum numbers
+            "strangeness": {"min_value": -3, "max_value": 0, "unit": "S", "log_scale": False},
+            "strangeness_s": {"min_value": -3, "max_value": 0, "unit": "S", "log_scale": False},
+            "charm": {"min_value": -2, "max_value": 2, "unit": "C", "log_scale": False},
+            "charm_c": {"min_value": -2, "max_value": 2, "unit": "C", "log_scale": False},
+            "bottomness": {"min_value": -1, "max_value": 1, "unit": "B'", "log_scale": False},
+            "bottomness_b": {"min_value": -1, "max_value": 1, "unit": "B'", "log_scale": False},
+
+            # Parity properties
+            "parity": {"min_value": -1, "max_value": 1, "unit": "P", "log_scale": False},
+            "parity_p": {"min_value": -1, "max_value": 1, "unit": "P", "log_scale": False},
+            "c-parity": {"min_value": -1, "max_value": 1, "unit": "C", "log_scale": False},
+            "cparity": {"min_value": -1, "max_value": 1, "unit": "C", "log_scale": False},
+
+            # Lifetime/decay properties
+            "half_life": {"min_value": 0, "max_value": 1e-8, "unit": "s", "log_scale": False},
+            "half-life": {"min_value": 0, "max_value": 1e-8, "unit": "s", "log_scale": False},
+            "half-life_log": {"min_value": -25, "max_value": -5, "unit": "log10(s)", "log_scale": True},
+            "half_life_log": {"min_value": -25, "max_value": -5, "unit": "log10(s)", "log_scale": True},
+            "mean_lifetime": {"min_value": 0, "max_value": 1e-8, "unit": "s", "log_scale": False},
+            "mean_lifetime_log": {"min_value": -25, "max_value": -5, "unit": "log10(s)", "log_scale": True},
+            "decay_width": {"min_value": 0, "max_value": 200, "unit": "MeV", "log_scale": False},
+            "decay_width_mev": {"min_value": 0, "max_value": 200, "unit": "MeV", "log_scale": False},
+
+            # Stability and misc
+            "stability": {"min_value": 0, "max_value": 1, "unit": "", "log_scale": False},
+            "quark_count": {"min_value": 2, "max_value": 3, "unit": "", "log_scale": False},
+            "none": {"min_value": 0, "max_value": 100, "unit": "", "log_scale": False},
         }
         return metadata_map.get(property_name, None)
 
@@ -574,53 +614,86 @@ class SubatomicControlPanel(QWidget):
         collapsible = CollapsibleBox("Visual Property Encodings", "#764ba2")
         properties_layout = QVBoxLayout()
 
-        # Available property options for subatomic particles
+        # Available property options for subatomic particles - comprehensive list
         color_properties = [
             "Mass (MeV/c^2)",
-            "Electric Charge",
-            "Spin",
-            "Half-Life",
-            "Strangeness",
-            "Isospin",
-            "Baryon Number",
+            "Mass (log scale)",
+            "Electric Charge (e)",
+            "Spin (hbar)",
+            "Half-Life (log)",
+            "Mean Lifetime (log)",
+            "Decay Width (MeV)",
+            "Strangeness (S)",
+            "Charm (C)",
+            "Bottomness (B')",
+            "Isospin (I)",
+            "Isospin I3",
+            "Baryon Number (B)",
+            "Lepton Number (L)",
+            "Parity (P)",
+            "C-Parity",
             "Stability",
+            "Quark Count",
             "None"
         ]
 
-        # 1. Fill Colour -> Mass_MeVc2 (index 0)
+        # Visual attribute controls with comprehensive property options
+        # Index mapping for the new property list:
+        # 0=Mass, 1=Mass(log), 2=Charge, 3=Spin, 4=Half-Life(log), 5=Mean Lifetime(log),
+        # 6=Decay Width, 7=Strangeness, 8=Charm, 9=Bottomness, 10=Isospin(I),
+        # 11=Isospin I3, 12=Baryon Number, 13=Lepton Number, 14=Parity, 15=C-Parity,
+        # 16=Stability, 17=Quark Count, 18=None
+
+        # 1. Fill Colour -> Mass (log scale for better visualization)
         self.fill_color_control = SubatomicPropertyControl(
             "Fill Colour", "fill_color", self, color_properties,
-            control_type="color", default_index=0)
-        self.fill_color_control.property_combo.setCurrentIndex(0)  # Mass
+            control_type="color", default_index=1)  # Mass (log scale)
+        self.fill_color_control.property_combo.setCurrentIndex(1)
         properties_layout.addWidget(self.fill_color_control)
 
-        # 2. Border Colour -> Charge_e (index 1)
+        # 2. Border Colour -> Electric Charge
         self.border_color_control = SubatomicPropertyControl(
             "Border Colour", "border_color", self, color_properties,
-            control_type="color", default_index=1)
-        self.border_color_control.property_combo.setCurrentIndex(1)  # Charge
+            control_type="color", default_index=2)  # Electric Charge
+        self.border_color_control.property_combo.setCurrentIndex(2)
         properties_layout.addWidget(self.border_color_control)
 
-        # 3. Glow Colour -> Spin_hbar (index 2)
+        # 3. Glow Colour -> Half-Life (log) - unstable particles glow more
         self.glow_color_control = SubatomicPropertyControl(
             "Glow Colour", "glow_color", self, color_properties,
-            control_type="color", default_index=2)
-        self.glow_color_control.property_combo.setCurrentIndex(2)  # Spin
+            control_type="color", default_index=4)  # Half-Life (log)
+        self.glow_color_control.property_combo.setCurrentIndex(4)
         properties_layout.addWidget(self.glow_color_control)
 
-        # 4. Inner Ring Colour -> BaryonNumber_B (index 6)
+        # 4. Inner Ring Colour -> Strangeness (for strange baryons/mesons)
         self.ring_color_control = SubatomicPropertyControl(
             "Inner Ring Colour", "ring_color", self, color_properties,
-            control_type="color", default_index=6)
-        self.ring_color_control.property_combo.setCurrentIndex(6)  # Baryon Number
+            control_type="color", default_index=7)  # Strangeness
+        self.ring_color_control.property_combo.setCurrentIndex(7)
         properties_layout.addWidget(self.ring_color_control)
 
-        # 5. Symbol Text Colour -> Isospin_I3 (index 5)
+        # 5. Symbol Text Colour -> Isospin I3
         self.symbol_text_color_control = SubatomicPropertyControl(
             "Symbol Text Colour", "symbol_text_color", self, color_properties,
-            control_type="color", default_index=5)
-        self.symbol_text_color_control.property_combo.setCurrentIndex(5)  # Isospin
+            control_type="color", default_index=11)  # Isospin I3
+        self.symbol_text_color_control.property_combo.setCurrentIndex(11)
         properties_layout.addWidget(self.symbol_text_color_control)
+
+        # 6. Size Scaling -> Mass (log scale)
+        size_properties = [
+            "Mass (MeV/c^2)",
+            "Mass (log scale)",
+            "Electric Charge (e)",
+            "Spin (hbar)",
+            "Quark Count",
+            "Isospin (I)",
+            "None"
+        ]
+        self.size_scale_control = SubatomicPropertyControl(
+            "Size Scaling", "size_scale", self, size_properties,
+            control_type="size", default_index=1)  # Mass (log scale)
+        self.size_scale_control.property_combo.setCurrentIndex(1)
+        properties_layout.addWidget(self.size_scale_control)
 
         # Reset button to restore default mappings
         reset_button = QPushButton("Reset to Defaults")
@@ -988,16 +1061,24 @@ class SubatomicControlPanel(QWidget):
 
     def reset_property_mappings(self):
         """Reset all property controls to their default mappings"""
-        # 1. Fill Colour -> Mass
-        self.fill_color_control.property_combo.setCurrentIndex(0)
-        # 2. Border Colour -> Charge
-        self.border_color_control.property_combo.setCurrentIndex(1)
-        # 3. Glow Colour -> Spin
-        self.glow_color_control.property_combo.setCurrentIndex(2)
-        # 4. Inner Ring Colour -> Baryon Number
-        self.ring_color_control.property_combo.setCurrentIndex(6)
-        # 5. Symbol Text Colour -> Isospin
-        self.symbol_text_color_control.property_combo.setCurrentIndex(5)
+        # Reset to new default indices based on comprehensive property list:
+        # 0=Mass, 1=Mass(log), 2=Charge, 3=Spin, 4=Half-Life(log), 5=Mean Lifetime(log),
+        # 6=Decay Width, 7=Strangeness, 8=Charm, 9=Bottomness, 10=Isospin(I),
+        # 11=Isospin I3, 12=Baryon Number, 13=Lepton Number, 14=Parity, 15=C-Parity,
+        # 16=Stability, 17=Quark Count, 18=None
+
+        # 1. Fill Colour -> Mass (log scale)
+        self.fill_color_control.property_combo.setCurrentIndex(1)
+        # 2. Border Colour -> Electric Charge
+        self.border_color_control.property_combo.setCurrentIndex(2)
+        # 3. Glow Colour -> Half-Life (log)
+        self.glow_color_control.property_combo.setCurrentIndex(4)
+        # 4. Inner Ring Colour -> Strangeness
+        self.ring_color_control.property_combo.setCurrentIndex(7)
+        # 5. Symbol Text Colour -> Isospin I3
+        self.symbol_text_color_control.property_combo.setCurrentIndex(11)
+        # 6. Size Scaling -> Mass (log scale) - index 1 in size properties
+        self.size_scale_control.property_combo.setCurrentIndex(1)
 
         self.table.update()
 

@@ -18,47 +18,135 @@ from data.data_manager import get_data_manager, DataCategory
 
 class QuarkPropertyName:
     """Property names for quark/particle data mapping"""
+    # Basic properties
     MASS = "Mass_MeVc2"
+    MASS_LOG = "Mass_MeVc2_log"  # Log scale for wide mass range
     CHARGE = "Charge_e"
     SPIN = "Spin_hbar"
+
+    # Quantum numbers
     BARYON_NUMBER = "BaryonNumber_B"
     LEPTON_NUMBER = "LeptonNumber_L"
     ISOSPIN = "Isospin_I"
+    ISOSPIN_I3 = "Isospin_I3"  # Third component of isospin
+    PARITY = "Parity_P"
+
+    # Categorical/derived properties
     PARTICLE_TYPE = "particle_type"
     GENERATION = "generation"
+    INTERACTION = "interaction"
     STABILITY = "Stability"
+
+    # Lifetime/decay properties
+    HALF_LIFE = "HalfLife_s"
+    HALF_LIFE_LOG = "HalfLife_s_log"  # Log scale for lifetime
+    DECAY_WIDTH = "Width_MeV"
+
+    # Magnetic properties
+    MAGNETIC_MOMENT = "MagneticDipoleMoment_J_T"
+
     NONE = "none"
 
     @classmethod
     def get_display_name(cls, prop):
         """Get display name for property"""
         names = {
-            cls.MASS: "Mass (MeV/c2)",
+            cls.MASS: "Mass (MeV/c^2)",
+            cls.MASS_LOG: "Mass (log scale)",
             cls.CHARGE: "Charge (e)",
             cls.SPIN: "Spin (hbar)",
-            cls.BARYON_NUMBER: "Baryon Number",
-            cls.LEPTON_NUMBER: "Lepton Number",
-            cls.ISOSPIN: "Isospin",
+            cls.BARYON_NUMBER: "Baryon Number (B)",
+            cls.LEPTON_NUMBER: "Lepton Number (L)",
+            cls.ISOSPIN: "Isospin (I)",
+            cls.ISOSPIN_I3: "Isospin I3",
+            cls.PARITY: "Parity (P)",
             cls.PARTICLE_TYPE: "Particle Type",
             cls.GENERATION: "Generation",
+            cls.INTERACTION: "Interaction Forces",
             cls.STABILITY: "Stability",
+            cls.HALF_LIFE: "Half-Life (s)",
+            cls.HALF_LIFE_LOG: "Half-Life (log)",
+            cls.DECAY_WIDTH: "Decay Width (MeV)",
+            cls.MAGNETIC_MOMENT: "Magnetic Moment",
             cls.NONE: "None"
         }
         return names.get(prop, prop)
 
     @classmethod
+    def get_json_key(cls, prop):
+        """Get the JSON data key for a property (stripping _log suffix if present)"""
+        key_map = {
+            cls.MASS: "Mass_MeVc2",
+            cls.MASS_LOG: "Mass_MeVc2",
+            cls.CHARGE: "Charge_e",
+            cls.SPIN: "Spin_hbar",
+            cls.BARYON_NUMBER: "BaryonNumber_B",
+            cls.LEPTON_NUMBER: "LeptonNumber_L",
+            cls.ISOSPIN: "Isospin_I",
+            cls.ISOSPIN_I3: "Isospin_I3",
+            cls.PARITY: "Parity_P",
+            cls.PARTICLE_TYPE: "Classification",
+            cls.GENERATION: "generation",
+            cls.INTERACTION: "InteractionForces",
+            cls.STABILITY: "Stability",
+            cls.HALF_LIFE: "HalfLife_s",
+            cls.HALF_LIFE_LOG: "HalfLife_s",
+            cls.DECAY_WIDTH: "Width_MeV",
+            cls.MAGNETIC_MOMENT: "MagneticDipoleMoment_J_T",
+            cls.NONE: None
+        }
+        return key_map.get(prop, None)
+
+    @classmethod
+    def is_log_scale(cls, prop):
+        """Check if property should use log scale"""
+        return prop in [cls.MASS_LOG, cls.HALF_LIFE_LOG]
+
+    @classmethod
     def get_color_properties(cls):
-        """Properties suitable for color encoding"""
+        """Properties suitable for color encoding (fill color gradient)"""
         return [
             cls.MASS,
+            cls.MASS_LOG,
             cls.CHARGE,
             cls.SPIN,
             cls.BARYON_NUMBER,
             cls.LEPTON_NUMBER,
             cls.ISOSPIN,
+            cls.ISOSPIN_I3,
+            cls.PARITY,
             cls.PARTICLE_TYPE,
             cls.GENERATION,
+            cls.INTERACTION,
             cls.STABILITY,
+            cls.HALF_LIFE_LOG,
+            cls.NONE
+        ]
+
+    @classmethod
+    def get_border_properties(cls):
+        """Properties suitable for border color encoding"""
+        return [
+            cls.CHARGE,
+            cls.PARTICLE_TYPE,
+            cls.GENERATION,
+            cls.PARITY,
+            cls.BARYON_NUMBER,
+            cls.LEPTON_NUMBER,
+            cls.STABILITY,
+            cls.NONE
+        ]
+
+    @classmethod
+    def get_glow_properties(cls):
+        """Properties suitable for glow effect encoding"""
+        return [
+            cls.STABILITY,
+            cls.HALF_LIFE_LOG,
+            cls.DECAY_WIDTH,
+            cls.INTERACTION,
+            cls.SPIN,
+            cls.GENERATION,
             cls.NONE
         ]
 
@@ -67,20 +155,25 @@ class QuarkPropertyName:
         """Properties suitable for size encoding"""
         return [
             cls.MASS,
+            cls.MASS_LOG,
             cls.CHARGE,
             cls.SPIN,
             cls.BARYON_NUMBER,
             cls.LEPTON_NUMBER,
+            cls.ISOSPIN,
             cls.NONE
         ]
 
     @classmethod
     def get_intensity_properties(cls):
-        """Properties suitable for intensity encoding"""
+        """Properties suitable for intensity/opacity encoding"""
         return [
             cls.MASS,
+            cls.MASS_LOG,
             cls.SPIN,
             cls.STABILITY,
+            cls.HALF_LIFE_LOG,
+            cls.DECAY_WIDTH,
             cls.NONE
         ]
 
@@ -88,13 +181,23 @@ class QuarkPropertyName:
     def get_property_range(cls, prop):
         """Get default min/max range for a property"""
         ranges = {
-            cls.MASS: (0.0, 175000.0),  # Up quark to top quark (MeV/c2)
+            cls.MASS: (0.0, 175000.0),  # Up quark to top quark (MeV/c^2)
+            cls.MASS_LOG: (0.0, 12.0),  # Log10 scale (log10(173000) ~ 5.2)
             cls.CHARGE: (-1.0, 1.0),  # In units of e
             cls.SPIN: (0.0, 1.0),  # In units of hbar
             cls.BARYON_NUMBER: (-1.0, 1.0),
             cls.LEPTON_NUMBER: (-1.0, 1.0),
             cls.ISOSPIN: (0.0, 1.0),
-            cls.GENERATION: (0, 3),
+            cls.ISOSPIN_I3: (-1.0, 1.0),
+            cls.PARITY: (-1, 1),
+            cls.PARTICLE_TYPE: (0, 5),  # Categorical
+            cls.GENERATION: (0, 3),  # 0=bosons, 1-3=fermion generations
+            cls.INTERACTION: (0, 4),  # Number of forces
+            cls.STABILITY: (0, 1),  # Binary stable/unstable
+            cls.HALF_LIFE: (0.0, 1e-10),  # In seconds
+            cls.HALF_LIFE_LOG: (-25, 0),  # Log10 scale
+            cls.DECAY_WIDTH: (0.0, 2500.0),  # In MeV (top quark ~1.42 GeV)
+            cls.MAGNETIC_MOMENT: (-1e-25, 1e-25),  # In J/T
             cls.NONE: (0, 1)
         }
         return ranges.get(prop, (0, 100))
@@ -857,28 +960,39 @@ class QuarkControlPanel(QWidget):
         """Create visual property encodings with expandable controls"""
         collapsible = CollapsibleBox("Visual Property Encodings", "#764ba2")
 
-        # Available properties for color encoding
+        # Available properties for color encoding - comprehensive list
         color_properties = QuarkPropertyName.get_color_properties()
 
-        # 1. Fill Colour -> Mass_MeVc2
+        # Index mapping for color_properties list:
+        # 0=Mass, 1=Mass(log), 2=Charge, 3=Spin, 4=Baryon Number, 5=Lepton Number,
+        # 6=Isospin(I), 7=Isospin I3, 8=Parity, 9=Particle Type, 10=Generation,
+        # 11=Interaction, 12=Stability, 13=Half-Life(log), 14=None
+
+        # 1. Fill Colour -> Mass (log scale for better visualization)
         self.fill_color_control = QuarkPropertyControl(
-            "Fill Colour", "fill_color", self, color_properties, default_index=0)
+            "Fill Colour", "fill_color", self, color_properties, default_index=1)  # Mass (log)
         collapsible.content_layout.addWidget(self.fill_color_control)
 
-        # 2. Border Colour -> Charge_e
+        # 2. Border Colour -> Electric Charge
         self.border_color_control = QuarkPropertyControl(
-            "Border Colour", "border_color", self, color_properties, default_index=1)
+            "Border Colour", "border_color", self, color_properties, default_index=2)  # Charge
         collapsible.content_layout.addWidget(self.border_color_control)
 
-        # 3. Glow Colour -> Spin_hbar
+        # 3. Glow Colour -> Stability (unstable particles glow more)
         self.glow_color_control = QuarkPropertyControl(
-            "Glow Colour", "glow_color", self, color_properties, default_index=2)
+            "Glow Colour", "glow_color", self, color_properties, default_index=12)  # Stability
         collapsible.content_layout.addWidget(self.glow_color_control)
 
-        # 4. Symbol Text Colour -> BaryonNumber_B
+        # 4. Symbol Text Colour -> Generation
         self.symbol_text_color_control = QuarkPropertyControl(
-            "Symbol Text Colour", "symbol_text_color", self, color_properties, default_index=3)
+            "Symbol Text Colour", "symbol_text_color", self, color_properties, default_index=10)  # Generation
         collapsible.content_layout.addWidget(self.symbol_text_color_control)
+
+        # 5. Size Scaling -> Mass (log scale)
+        size_properties = QuarkPropertyName.get_size_properties()
+        self.size_scale_control = QuarkPropertyControl(
+            "Size Scaling", "size_scale", self, size_properties, default_index=1)  # Mass (log)
+        collapsible.content_layout.addWidget(self.size_scale_control)
 
         # Reset button for visual encodings
         reset_visual_btn = QPushButton("Reset Visual Encodings")
@@ -1201,14 +1315,16 @@ class QuarkControlPanel(QWidget):
 
     def _reset_visual_encodings(self):
         """Reset all visual property encodings to defaults"""
-        # Reset fill color to Mass
-        self.fill_color_control.property_combo.setCurrentIndex(0)
-        # Reset border color to Charge
-        self.border_color_control.property_combo.setCurrentIndex(1)
-        # Reset glow color to Spin
-        self.glow_color_control.property_combo.setCurrentIndex(2)
-        # Reset symbol text color to Baryon Number
-        self.symbol_text_color_control.property_combo.setCurrentIndex(3)
+        # Reset fill color to Mass (log scale) - index 1
+        self.fill_color_control.property_combo.setCurrentIndex(1)
+        # Reset border color to Charge - index 2
+        self.border_color_control.property_combo.setCurrentIndex(2)
+        # Reset glow color to Stability - index 12
+        self.glow_color_control.property_combo.setCurrentIndex(12)
+        # Reset symbol text color to Generation - index 10
+        self.symbol_text_color_control.property_combo.setCurrentIndex(10)
+        # Reset size scaling to Mass (log scale) - index 1
+        self.size_scale_control.property_combo.setCurrentIndex(1)
         self.table.update()
 
     def _on_antiparticle_toggled(self, checked):

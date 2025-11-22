@@ -11,6 +11,7 @@ from PySide6.QtGui import (QPainter, QColor, QPen, QBrush, QFont, QPainterPath,
                            QLinearGradient, QRadialGradient, QPolygonF, QGuiApplication)
 
 from data.subatomic_loader import get_subatomic_loader, SubatomicDataLoader
+from data.layout_config_loader import get_subatomic_config
 from core.subatomic_enums import (SubatomicLayoutMode, ParticleCategory, SubatomicProperty,
                                    QuarkType, PARTICLE_COLORS, get_particle_family_color)
 
@@ -731,23 +732,39 @@ class SubatomicUnifiedTable(QWidget):
         painter.drawText(int(x + 5), int(y + self.card_height - 8), category_text)
 
     def _draw_quark_composition(self, painter, x, y, particle):
-        """Draw visual representation of quark composition"""
+        """Draw visual representation of quark composition using configuration"""
         quarks = particle.get('_parsed_quarks', [])
         if not quarks:
-            return
+            # Fallback: try to parse from Composition field in particle JSON
+            composition = particle.get('Composition', [])
+            if composition:
+                quarks = self._parse_quarks_from_composition(composition)
+            if not quarks:
+                return
 
-        quark_size = 18
-        spacing = 22
-        total_width = len(quarks) * spacing
+        # Get configuration values from layout_config.json
+        quark_size = get_subatomic_config('card_quark_mini', 'quark_size', default=18)
+        spacing = get_subatomic_config('card_quark_mini', 'quark_spacing', default=22)
+        border_width = get_subatomic_config('card_quark_mini', 'border_width', default=1)
+        label_font_size = get_subatomic_config('card_quark_mini', 'label_font_size', default=9)
 
-        # Center the quarks
+        # Scale quark size for many quarks to fit in card
+        num_quarks = len(quarks)
+        if num_quarks > 3:
+            scale_factor = max(0.6, 3 / num_quarks)
+            quark_size = int(quark_size * scale_factor)
+            spacing = int(spacing * scale_factor)
+
+        total_width = num_quarks * spacing
+
+        # Center the quarks within the card
         start_x = x + (self.card_width - 20 - total_width) / 2
 
         for i, quark in enumerate(quarks):
             qx = start_x + i * spacing
             qy = y
 
-            # Get quark color
+            # Get quark color from type
             quark_type = quark.get('type', 'u')
             is_anti = quark.get('is_anti', False)
 
@@ -759,20 +776,52 @@ class SubatomicUnifiedTable(QWidget):
             color_tuple = QuarkType.get_color(QuarkType.from_string(quark_type_full))
             color = QColor(color_tuple[0], color_tuple[1], color_tuple[2])
 
-            # Draw quark circle
+            # Draw quark circle with configurable border
             painter.setBrush(QBrush(color))
-            painter.setPen(QPen(QColor(255, 255, 255), 1))
+            painter.setPen(QPen(QColor(255, 255, 255), border_width))
             painter.drawEllipse(int(qx), int(qy), quark_size, quark_size)
 
-            # Draw quark label
+            # Draw quark label with configurable font size
             painter.setPen(QPen(QColor(0, 0, 0)))
-            font = QFont("Arial", 9, QFont.Weight.Bold)
+            font = QFont("Arial", label_font_size, QFont.Weight.Bold)
             painter.setFont(font)
             label = quark_type.upper()
             if is_anti:
                 label = label + '\u0305'  # Combining overline
             painter.drawText(QRectF(qx, qy, quark_size, quark_size),
                            Qt.AlignmentFlag.AlignCenter, label)
+
+    def _parse_quarks_from_composition(self, composition):
+        """Parse quark list from particle's Composition field in JSON data"""
+        quarks = []
+        for comp in composition:
+            constituent = comp.get('Constituent', '')
+            count = comp.get('Count', 1)
+            symbol = comp.get('Symbol', '')
+            is_anti = comp.get('IsAnti', False) or 'Anti' in constituent
+
+            # Determine quark type from symbol or constituent name
+            quark_type = symbol.replace('-bar', '').lower() if symbol else ''
+            if not quark_type:
+                if 'up' in constituent.lower():
+                    quark_type = 'u'
+                elif 'down' in constituent.lower():
+                    quark_type = 'd'
+                elif 'strange' in constituent.lower():
+                    quark_type = 's'
+                elif 'charm' in constituent.lower():
+                    quark_type = 'c'
+                elif 'bottom' in constituent.lower():
+                    quark_type = 'b'
+                elif 'top' in constituent.lower():
+                    quark_type = 't'
+
+            for _ in range(count):
+                quarks.append({
+                    'type': quark_type,
+                    'is_anti': is_anti
+                })
+        return quarks
 
     def _draw_decay_arrows(self, painter):
         """Draw arrows showing decay relationships"""
@@ -894,6 +943,36 @@ class SubatomicUnifiedTable(QWidget):
             zoom_level: Zoom factor (0.2 to 5.0, where 1.0 is default)
         """
         self.zoom_level = max(0.2, min(5.0, zoom_level))
+        self.update()
+
+    def set_gradient_colors(self, property_key, start_color, end_color):
+        """Set custom gradient colors for a visual property encoding.
+
+        Args:
+            property_key: Visual encoding key (e.g., 'fill_color', 'border_color')
+            start_color: Starting color (QColor or hex string)
+            end_color: Ending color (QColor or hex string)
+        """
+        # Store custom gradient colors for use in rendering
+        if not hasattr(self, 'custom_gradients'):
+            self.custom_gradients = {}
+        self.custom_gradients[property_key] = {
+            'start': start_color if isinstance(start_color, str) else start_color.name(),
+            'end': end_color if isinstance(end_color, str) else end_color.name()
+        }
+        self.update()
+
+    def set_fade_value(self, property_key, fade_value):
+        """Set the fade amount for a visual property encoding.
+
+        Args:
+            property_key: Visual encoding key (e.g., 'fill_color', 'border_color')
+            fade_value: Fade amount from 0.0 (no fade) to 1.0 (fully transparent)
+        """
+        # Store fade values for use in rendering
+        if not hasattr(self, 'fade_values'):
+            self.fade_values = {}
+        self.fade_values[property_key] = max(0.0, min(1.0, fade_value))
         self.update()
 
     def reload_data(self):
