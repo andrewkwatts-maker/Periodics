@@ -524,6 +524,146 @@ def spherical_harmonic_prefactor(l: int, m: int) -> float:
     return math.sqrt((2*l + 1) / (4 * math.pi) * ratio)
 
 
+def spherical_harmonic(l: int, m: int, theta: float, phi: float) -> complex:
+    """
+    Compute the complex spherical harmonic Y_l^m(θ, φ).
+
+    The spherical harmonics are the angular portion of solutions to Laplace's
+    equation in spherical coordinates. They form a complete orthonormal basis
+    for functions on the sphere.
+
+    Definition:
+        Y_l^m(θ,φ) = K_l^m * P_l^|m|(cos θ) * exp(i*m*φ)
+
+    where K_l^m is the normalization prefactor and P_l^|m| is the associated
+    Legendre polynomial.
+
+    For negative m, uses the symmetry relation:
+        Y_l^{-m} = (-1)^m * conj(Y_l^m)
+
+    Parameters
+    ----------
+    l : int
+        Degree (l >= 0)
+    m : int
+        Order (-l <= m <= l)
+    theta : float
+        Polar angle (colatitude) in radians [0, π]
+    phi : float
+        Azimuthal angle in radians [0, 2π]
+
+    Returns
+    -------
+    complex
+        The complex value Y_l^m(θ, φ)
+
+    Notes
+    -----
+    The spherical harmonics satisfy:
+    - Orthonormality: ∫ Y_l^m* Y_l'^m' dΩ = δ_{ll'} δ_{mm'}
+    - Symmetry: Y_l^{-m} = (-1)^m * conj(Y_l^m)
+
+    In quantum mechanics, |Y_l^m|² gives the angular probability density
+    for an electron in an orbital with quantum numbers l and m.
+
+    This implementation matches scipy.special.sph_harm convention.
+
+    Examples
+    --------
+    >>> Y00 = spherical_harmonic(0, 0, 0, 0)
+    >>> abs(Y00 - 0.5/math.sqrt(math.pi)) < 1e-10
+    True
+    """
+    if l < 0:
+        raise ValueError(f"Degree l must be non-negative: {l}")
+    if abs(m) > l:
+        return complex(0.0, 0.0)
+
+    # Handle negative m using symmetry relation:
+    # Y_l^{-m} = (-1)^m * conj(Y_l^m)
+    # This matches scipy.special.sph_harm convention
+    if m < 0:
+        Y_pos = spherical_harmonic(l, -m, theta, phi)
+        sign = (-1) ** (-m)
+        return sign * Y_pos.conjugate()
+
+    # For m >= 0: compute directly
+    # Normalization prefactor (uses |m| = m since m >= 0)
+    K = spherical_harmonic_prefactor(l, m)
+
+    # Associated Legendre polynomial P_l^m at cos(theta)
+    cos_theta = math.cos(theta)
+    P_lm = lpmv(m, l, cos_theta)
+
+    # Complex exponential exp(i*m*φ)
+    real_part = math.cos(m * phi)
+    imag_part = math.sin(m * phi)
+
+    # Y_l^m = K * P_l^m * exp(i*m*φ)
+    result = K * P_lm * complex(real_part, imag_part)
+
+    return result
+
+
+def spherical_harmonic_real(l: int, m: int, theta: float, phi: float) -> float:
+    """
+    Compute real spherical harmonics (for visualization).
+
+    Real spherical harmonics are linear combinations of complex spherical
+    harmonics that are purely real-valued. They are commonly used in
+    visualization and for real-valued expansions.
+
+    Definition:
+        Y_l^m (m > 0):  sqrt(2) * Re[Y_l^m] = sqrt(2) * K * P_l^m * cos(m*φ)
+        Y_l^0:          Y_l^0 (already real)
+        Y_l^m (m < 0):  sqrt(2) * Im[Y_l^|m|] = sqrt(2) * K * P_l^|m| * sin(|m|*φ)
+
+    Parameters
+    ----------
+    l : int
+        Degree (l >= 0)
+    m : int
+        Order (-l <= m <= l)
+    theta : float
+        Polar angle in radians [0, π]
+    phi : float
+        Azimuthal angle in radians [0, 2π]
+
+    Returns
+    -------
+    float
+        The real spherical harmonic value
+
+    Notes
+    -----
+    These are particularly useful for:
+    - Plotting orbital shapes (d_xy, d_xz, etc.)
+    - Computer graphics (spherical harmonic lighting)
+    - Real-valued function expansions
+    """
+    if l < 0:
+        raise ValueError(f"Degree l must be non-negative: {l}")
+    if abs(m) > l:
+        return 0.0
+
+    # Normalization prefactor
+    K = spherical_harmonic_prefactor(l, abs(m))
+
+    # Associated Legendre polynomial at cos(theta)
+    cos_theta = math.cos(theta)
+    P_lm = lpmv(abs(m), l, cos_theta)
+
+    if m > 0:
+        # Y_l^m (real) = sqrt(2) * K * P_l^m * cos(m*φ)
+        return math.sqrt(2) * K * P_lm * math.cos(m * phi)
+    elif m < 0:
+        # Y_l^m (real) = sqrt(2) * K * P_l^|m| * sin(|m|*φ)
+        return math.sqrt(2) * K * P_lm * math.sin(abs(m) * phi)
+    else:
+        # m = 0: already real
+        return K * P_lm
+
+
 def binomial(n: int, k: int) -> int:
     """
     Compute binomial coefficient C(n, k) = n! / (k! * (n-k)!).

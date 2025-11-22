@@ -718,6 +718,7 @@ class QuarkControlPanel(QWidget):
     edit_requested = Signal()
     remove_requested = Signal()
     reset_requested = Signal()
+    create_requested = Signal()
 
     def __init__(self, table_widget):
         super().__init__()
@@ -1106,6 +1107,23 @@ class QuarkControlPanel(QWidget):
         btn_layout.addWidget(self.remove_btn)
 
         layout.addLayout(btn_layout)
+
+        # Create button (quarks are fundamental, so this just adds a new quark)
+        self.create_btn = QPushButton("Create New Quark")
+        self.create_btn.setStyleSheet("""
+            QPushButton {
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #667eea, stop:1 #764ba2);
+                color: white;
+                padding: 8px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #764ba2, stop:1 #667eea);
+            }
+        """)
+        self.create_btn.clicked.connect(self.create_requested.emit)
+        layout.addWidget(self.create_btn)
 
         # Reset button
         self.reset_data_btn = QPushButton("Reset to Defaults")

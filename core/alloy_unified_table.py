@@ -51,10 +51,15 @@ class AlloyUnifiedTable(QWidget):
         self.hovered_alloy = None
         self.selected_alloy = None
 
-        # Filters
+        # Filters (single-value, legacy)
         self.category_filter = None
         self.structure_filter = None
         self.element_filter = None
+
+        # Filters (multi-select)
+        self.category_filters = ['Steel', 'Aluminum', 'Copper', 'Titanium', 'Nickel', 'Precious']  # All by default
+        self.structure_filters = ['FCC', 'BCC', 'HCP']  # All by default
+        self.corrosion_filters = ['Excellent', 'Good', 'Moderate', 'Poor']  # All by default
 
         # Visual settings
         self.zoom_level = 1.0
@@ -103,6 +108,36 @@ class AlloyUnifiedTable(QWidget):
         self._update_layout()
         self.update()
 
+    def set_category_filters(self, categories):
+        """Set category filter (multi-select list)
+
+        Args:
+            categories: List of category names to show, e.g. ['Steel', 'Aluminum', 'Copper']
+        """
+        self.category_filters = categories if categories else []
+        self._update_layout()
+        self.update()
+
+    def set_structure_filters(self, structures):
+        """Set crystal structure filter (multi-select list)
+
+        Args:
+            structures: List of crystal structures to show, e.g. ['FCC', 'BCC', 'HCP']
+        """
+        self.structure_filters = structures if structures else []
+        self._update_layout()
+        self.update()
+
+    def set_corrosion_filters(self, ratings):
+        """Set corrosion resistance filter (multi-select list)
+
+        Args:
+            ratings: List of corrosion resistance ratings to show, e.g. ['Excellent', 'Good']
+        """
+        self.corrosion_filters = ratings if ratings else []
+        self._update_layout()
+        self.update()
+
     def set_scatter_properties(self, x_prop, y_prop):
         """Set properties for scatter plot axes"""
         self.scatter_x_property = x_prop
@@ -119,16 +154,64 @@ class AlloyUnifiedTable(QWidget):
         """Get alloys after applying filters"""
         alloys = self.base_alloys.copy()
 
-        if self.category_filter:
+        # Apply multi-select category filter
+        if self.category_filters:
+            alloys = [a for a in alloys if self._matches_category(a)]
+        elif self.category_filter:  # Legacy single-value filter
             alloys = [a for a in alloys if a.get('category', '').lower() == self.category_filter.lower()]
 
-        if self.structure_filter:
+        # Apply multi-select structure filter
+        if self.structure_filters:
+            alloys = [a for a in alloys if self._matches_structure(a)]
+        elif self.structure_filter:  # Legacy single-value filter
             alloys = [a for a in alloys if a.get('crystal_structure', '').upper() == self.structure_filter.upper()]
 
+        # Apply multi-select corrosion filter
+        if self.corrosion_filters:
+            alloys = [a for a in alloys if self._matches_corrosion(a)]
+
+        # Apply element filter (single value only)
         if self.element_filter:
             alloys = [a for a in alloys if a.get('primary_element') == self.element_filter]
 
         return alloys
+
+    def _matches_category(self, alloy):
+        """Check if alloy matches category filter"""
+        if not self.category_filters:
+            return True  # No filter, show all
+        alloy_category = alloy.get('category', '')
+        # Check both exact match and case-insensitive match
+        return (alloy_category in self.category_filters or
+                alloy_category.title() in self.category_filters or
+                alloy_category.lower() in [c.lower() for c in self.category_filters])
+
+    def _matches_structure(self, alloy):
+        """Check if alloy matches crystal structure filter"""
+        if not self.structure_filters:
+            return True  # No filter, show all
+        alloy_structure = alloy.get('crystal_structure', '').upper()
+        return alloy_structure in [s.upper() for s in self.structure_filters]
+
+    def _matches_corrosion(self, alloy):
+        """Check if alloy matches corrosion resistance filter"""
+        if not self.corrosion_filters:
+            return True  # No filter, show all
+
+        # Check corrosion_resistance field
+        corrosion = alloy.get('corrosion_resistance', '')
+        if not corrosion:
+            # Try to infer from other properties
+            corrosion = alloy.get('corrosion_rating', '')
+
+        # Normalize the rating
+        if isinstance(corrosion, str):
+            corrosion_normalized = corrosion.title()
+            return (corrosion_normalized in self.corrosion_filters or
+                    corrosion in self.corrosion_filters)
+
+        # If no corrosion data and all filters selected, show by default
+        return len(self.corrosion_filters) == 4
 
     def _update_layout(self):
         """Recalculate positions for all alloys"""
@@ -522,4 +605,42 @@ class AlloyUnifiedTable(QWidget):
         """Reload alloy data from files"""
         self.base_alloys = self.loader.load_all_alloys()
         self._update_layout()
+        self.update()
+
+    def set_property_filter(self, property_key, min_val, max_val):
+        """Set filter range for a property. Items outside the range will be grayed out.
+
+        Args:
+            property_key: Visual element key to filter by (fill_color, border_color, etc.)
+            min_val: Minimum value for the filter range
+            max_val: Maximum value for the filter range
+        """
+        if not hasattr(self, 'property_filter_ranges'):
+            self.property_filter_ranges = {}
+        self.property_filter_ranges[property_key] = (min_val, max_val)
+        self.update()
+
+    def set_gradient_colors(self, property_key, start_color, end_color):
+        """Set custom gradient colors for visual property encoding.
+
+        Args:
+            property_key: Visual element key to set gradient for
+            start_color: Start color of the gradient (QColor)
+            end_color: End color of the gradient (QColor)
+        """
+        if not hasattr(self, 'gradient_colors'):
+            self.gradient_colors = {}
+        self.gradient_colors[property_key] = (start_color, end_color)
+        self.update()
+
+    def set_property_fade(self, property_key, fade_value):
+        """Set fade value for items outside the filter range.
+
+        Args:
+            property_key: Visual element key to set fade for
+            fade_value: Fade value from 0.0 (no fade) to 1.0 (fully faded)
+        """
+        if not hasattr(self, 'fade_values'):
+            self.fade_values = {}
+        self.fade_values[property_key] = fade_value
         self.update()

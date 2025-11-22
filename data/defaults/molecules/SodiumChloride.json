@@ -18,6 +18,13 @@
     "Bonds": [
         {"From": "Na", "To": "Cl", "Type": "Ionic", "Length_pm": 282, "Index": 1}
     ],
+    "Atoms3D": [
+        {"element": "Na", "x": 0.0, "y": 0.0, "z": 0.0, "index": 0},
+        {"element": "Cl", "x": 2.82, "y": 0.0, "z": 0.0, "index": 1}
+    ],
+    "Bonds3D": [
+        {"from": 0, "to": 1, "type": "ionic", "length_A": 2.82}
+    ],
     "DipoleMoment_D": 9.0,
     "ElectronConfiguration": "Na: 1s2 2s2 2p6 3s1, Cl: 1s2 2s2 2p6 3s2 3p5",
     "Applications": ["Table salt", "Food preservation", "De-icing", "Chemical production"],

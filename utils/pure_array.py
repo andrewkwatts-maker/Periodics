@@ -614,6 +614,199 @@ def distance(p1: Tuple[float, float, float], p2: Tuple[float, float, float]) -> 
 
 
 # =============================================================================
+# 3D Rotation Matrix Functions
+# =============================================================================
+
+def rotation_matrix_x(angle: float) -> List[List[float]]:
+    """
+    Create a 3x3 rotation matrix for rotation around the X axis.
+
+    The rotation is counter-clockwise when looking from positive X towards origin.
+
+    Args:
+        angle: Rotation angle in radians.
+
+    Returns:
+        3x3 rotation matrix as list of lists [[r00, r01, r02], [r10, r11, r12], [r20, r21, r22]].
+
+    Example:
+        >>> R = rotation_matrix_x(math.pi / 2)  # 90 degrees
+        >>> # Rotates Y axis to Z axis
+    """
+    c = cos(angle)
+    s = sin(angle)
+    return [
+        [1.0, 0.0, 0.0],
+        [0.0, c, -s],
+        [0.0, s, c]
+    ]
+
+
+def rotation_matrix_y(angle: float) -> List[List[float]]:
+    """
+    Create a 3x3 rotation matrix for rotation around the Y axis.
+
+    The rotation is counter-clockwise when looking from positive Y towards origin.
+
+    Args:
+        angle: Rotation angle in radians.
+
+    Returns:
+        3x3 rotation matrix as list of lists.
+    """
+    c = cos(angle)
+    s = sin(angle)
+    return [
+        [c, 0.0, s],
+        [0.0, 1.0, 0.0],
+        [-s, 0.0, c]
+    ]
+
+
+def rotation_matrix_z(angle: float) -> List[List[float]]:
+    """
+    Create a 3x3 rotation matrix for rotation around the Z axis.
+
+    The rotation is counter-clockwise when looking from positive Z towards origin.
+
+    Args:
+        angle: Rotation angle in radians.
+
+    Returns:
+        3x3 rotation matrix as list of lists.
+    """
+    c = cos(angle)
+    s = sin(angle)
+    return [
+        [c, -s, 0.0],
+        [s, c, 0.0],
+        [0.0, 0.0, 1.0]
+    ]
+
+
+def rotation_matrix_axis_angle(axis: Tuple[float, float, float], angle: float) -> List[List[float]]:
+    """
+    Create a 3x3 rotation matrix for rotation around an arbitrary axis (Rodrigues' formula).
+
+    Args:
+        axis: Unit vector (x, y, z) defining the rotation axis.
+               Will be normalized if not already unit length.
+        angle: Rotation angle in radians.
+
+    Returns:
+        3x3 rotation matrix as list of lists.
+
+    Notes:
+        Uses Rodrigues' rotation formula:
+        R = I + sin(θ)K + (1-cos(θ))K²
+
+        where K is the skew-symmetric cross-product matrix of the axis.
+    """
+    # Normalize the axis
+    ax, ay, az = axis
+    length = sqrt(ax * ax + ay * ay + az * az)
+    if length < 1e-10:
+        # Return identity for zero-length axis
+        return [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+
+    ax /= length
+    ay /= length
+    az /= length
+
+    c = cos(angle)
+    s = sin(angle)
+    t = 1.0 - c
+
+    # Rodrigues' rotation formula
+    return [
+        [c + ax * ax * t, ax * ay * t - az * s, ax * az * t + ay * s],
+        [ay * ax * t + az * s, c + ay * ay * t, ay * az * t - ax * s],
+        [az * ax * t - ay * s, az * ay * t + ax * s, c + az * az * t]
+    ]
+
+
+def rotation_matrix_euler(roll: float, pitch: float, yaw: float) -> List[List[float]]:
+    """
+    Create a 3x3 rotation matrix from Euler angles (ZYX convention).
+
+    Applies rotations in order: roll (X), pitch (Y), yaw (Z).
+    This is the common aerospace convention (extrinsic rotations).
+
+    Args:
+        roll: Rotation around X axis in radians.
+        pitch: Rotation around Y axis in radians.
+        yaw: Rotation around Z axis in radians.
+
+    Returns:
+        3x3 rotation matrix as list of lists.
+    """
+    # Compute individual rotation matrices
+    Rx = rotation_matrix_x(roll)
+    Ry = rotation_matrix_y(pitch)
+    Rz = rotation_matrix_z(yaw)
+
+    # Combine: R = Rz * Ry * Rx (applied right to left)
+    temp = matrix_multiply_3x3(Rz, Ry)
+    return matrix_multiply_3x3(temp, Rx)
+
+
+def matrix_multiply_3x3(A: List[List[float]], B: List[List[float]]) -> List[List[float]]:
+    """
+    Multiply two 3x3 matrices.
+
+    Args:
+        A: First 3x3 matrix.
+        B: Second 3x3 matrix.
+
+    Returns:
+        Result of A * B as 3x3 matrix.
+    """
+    result = [[0.0] * 3 for _ in range(3)]
+    for i in range(3):
+        for j in range(3):
+            for k in range(3):
+                result[i][j] += A[i][k] * B[k][j]
+    return result
+
+
+def matrix_vector_multiply_3x3(M: List[List[float]], v: Tuple[float, float, float]) -> Tuple[float, float, float]:
+    """
+    Multiply a 3x3 matrix by a 3D vector.
+
+    Args:
+        M: 3x3 matrix.
+        v: 3D vector as tuple (x, y, z).
+
+    Returns:
+        Result as tuple (x', y', z').
+    """
+    return (
+        M[0][0] * v[0] + M[0][1] * v[1] + M[0][2] * v[2],
+        M[1][0] * v[0] + M[1][1] * v[1] + M[1][2] * v[2],
+        M[2][0] * v[0] + M[2][1] * v[1] + M[2][2] * v[2]
+    )
+
+
+def apply_rotation_matrix(M: List[List[float]], vec: 'Vec3') -> 'Vec3':
+    """
+    Apply a 3x3 rotation matrix to a Vec3.
+
+    Args:
+        M: 3x3 rotation matrix.
+        vec: Vec3 to transform.
+
+    Returns:
+        New rotated Vec3.
+    """
+    x, y, z = vec.x, vec.y, vec.z
+    return Vec3(
+        M[0][0] * x + M[0][1] * y + M[0][2] * z,
+        M[1][0] * x + M[1][1] * y + M[1][2] * z,
+        M[2][0] * x + M[2][1] * y + M[2][2] * z
+    )
+
+
+# =============================================================================
 # Module Self-Test
 # =============================================================================
 

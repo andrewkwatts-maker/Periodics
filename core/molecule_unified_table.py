@@ -25,6 +25,42 @@ from layouts.molecule_density_layout import MoleculeDensityLayout
 from layouts.molecule_bond_complexity_layout import MoleculeBondComplexityLayout
 
 
+def rotate_point_3d(x, y, z, pitch, yaw, roll):
+    """
+    Apply 3D rotation and return transformed coordinates.
+
+    Args:
+        x, y, z: Original 3D coordinates (relative to center)
+        pitch: Rotation around X-axis (tilt up/down) in degrees
+        yaw: Rotation around Y-axis (turn left/right) in degrees
+        roll: Rotation around Z-axis (spin) in degrees
+
+    Returns:
+        Tuple of (x2d, y2d, z_depth) for 2D projection with depth info
+    """
+    # Convert to radians
+    pitch_rad = math.radians(pitch)
+    yaw_rad = math.radians(yaw)
+    roll_rad = math.radians(roll)
+
+    # Rotation around X-axis (pitch)
+    y1 = y * math.cos(pitch_rad) - z * math.sin(pitch_rad)
+    z1 = y * math.sin(pitch_rad) + z * math.cos(pitch_rad)
+    x1 = x
+
+    # Rotation around Y-axis (yaw)
+    x2 = x1 * math.cos(yaw_rad) + z1 * math.sin(yaw_rad)
+    z2 = -x1 * math.sin(yaw_rad) + z1 * math.cos(yaw_rad)
+    y2 = y1
+
+    # Rotation around Z-axis (roll)
+    x3 = x2 * math.cos(roll_rad) - y2 * math.sin(roll_rad)
+    y3 = x2 * math.sin(roll_rad) + y2 * math.cos(roll_rad)
+    z3 = z2
+
+    return x3, y3, z3
+
+
 class MoleculeUnifiedTable(QWidget):
     """Main widget for visualizing molecules"""
 
@@ -46,16 +82,32 @@ class MoleculeUnifiedTable(QWidget):
         self.hovered_molecule = None
         self.selected_molecule = None
 
-        # Filters
+        # Filters (single-value, legacy)
         self.category_filter = None  # None means show all
         self.polarity_filter = None
         self.state_filter = None
+
+        # Filters (multi-select)
+        self.state_filters = ['Solid', 'Liquid', 'Gas']  # Show all by default
+        self.polarity_filters = ['Polar', 'Nonpolar']  # Show all by default
+        self.bond_type_filters = ['Ionic', 'Covalent', 'Polar Covalent']  # Show all by default
+        self.category_filters = ['Organic', 'Inorganic']  # Show all by default
 
         # Visual settings
         self.zoom_level = 1.0
         self.pan_x = 0
         self.pan_y = 0
         self.scroll_offset_y = 0
+
+        # Pan interaction state
+        self.is_panning = False
+        self.pan_start_x = 0
+        self.pan_start_y = 0
+
+        # 3D rotation angles (in degrees)
+        self.pitch = 0.0
+        self.yaw = 0.0
+        self.roll = 0.0
 
         # Layout renderers
         self.layouts = {
@@ -94,25 +146,154 @@ class MoleculeUnifiedTable(QWidget):
         self.update()
 
     def set_state_filter(self, state):
-        """Set state filter"""
+        """Set state filter (single value, legacy)"""
         self.state_filter = state
         self._update_layout()
+        self.update()
+
+    def set_state_filters(self, states):
+        """Set state filter (multi-select list)
+
+        Args:
+            states: List of state names to show, e.g. ['Solid', 'Liquid', 'Gas']
+        """
+        self.state_filters = states if states else []
+        self._update_layout()
+        self.update()
+
+    def set_polarity_filters(self, polarities):
+        """Set polarity filter (multi-select list)
+
+        Args:
+            polarities: List of polarity types to show, e.g. ['Polar', 'Nonpolar']
+        """
+        self.polarity_filters = polarities if polarities else []
+        self._update_layout()
+        self.update()
+
+    def set_bond_type_filters(self, bond_types):
+        """Set bond type filter (multi-select list)
+
+        Args:
+            bond_types: List of bond types to show, e.g. ['Ionic', 'Covalent', 'Polar Covalent']
+        """
+        self.bond_type_filters = bond_types if bond_types else []
+        self._update_layout()
+        self.update()
+
+    def set_category_filters(self, categories):
+        """Set category filter (multi-select list)
+
+        Args:
+            categories: List of categories to show, e.g. ['Organic', 'Inorganic']
+        """
+        self.category_filters = categories if categories else []
+        self._update_layout()
+        self.update()
+
+    def set_rotation(self, pitch, yaw, roll):
+        """Set 3D rotation angles for molecule structure visualization.
+
+        Args:
+            pitch: Rotation around X-axis (tilt up/down) in degrees (-180 to 180)
+            yaw: Rotation around Y-axis (turn left/right) in degrees (-180 to 180)
+            roll: Rotation around Z-axis (spin) in degrees (-180 to 180)
+        """
+        self.pitch = pitch
+        self.yaw = yaw
+        self.roll = roll
         self.update()
 
     def _get_filtered_molecules(self):
         """Get molecules after applying filters"""
         molecules = self.base_molecules.copy()
 
-        if self.category_filter:
+        # Apply multi-select category filter
+        if self.category_filters:
+            molecules = [m for m in molecules if self._matches_category(m)]
+        elif self.category_filter:  # Legacy single-value filter
             molecules = [m for m in molecules if m.get('category') == self.category_filter]
 
-        if self.polarity_filter:
+        # Apply multi-select polarity filter
+        if self.polarity_filters:
+            molecules = [m for m in molecules if self._matches_polarity(m)]
+        elif self.polarity_filter:  # Legacy single-value filter
             molecules = [m for m in molecules if m.get('polarity') == self.polarity_filter]
 
-        if self.state_filter:
+        # Apply multi-select state filter
+        if self.state_filters:
+            molecules = [m for m in molecules if self._matches_state(m)]
+        elif self.state_filter:  # Legacy single-value filter
             molecules = [m for m in molecules if m.get('state') == self.state_filter]
 
+        # Apply multi-select bond type filter
+        if self.bond_type_filters:
+            molecules = [m for m in molecules if self._matches_bond_type(m)]
+
         return molecules
+
+    def _matches_category(self, molecule):
+        """Check if molecule matches category filter"""
+        if not self.category_filters:
+            return True  # No filter, show all
+        mol_category = molecule.get('category', '').capitalize()
+        return mol_category in self.category_filters or molecule.get('category', '') in self.category_filters
+
+    def _matches_polarity(self, molecule):
+        """Check if molecule matches polarity filter"""
+        if not self.polarity_filters:
+            return True  # No filter, show all
+        mol_polarity = molecule.get('polarity', '').capitalize()
+        return mol_polarity in self.polarity_filters or molecule.get('polarity', '') in self.polarity_filters
+
+    def _matches_state(self, molecule):
+        """Check if molecule matches state filter"""
+        if not self.state_filters:
+            return True  # No filter, show all
+        mol_state = molecule.get('state', '').capitalize()
+        return mol_state in self.state_filters or molecule.get('state', '') in self.state_filters
+
+    def _matches_bond_type(self, molecule):
+        """Check if molecule matches bond type filter"""
+        if not self.bond_type_filters:
+            return True  # No filter, show all
+
+        # Get primary bond type from molecule
+        mol_bond_type = molecule.get('bond_type', '')
+
+        # Normalize the bond type
+        normalized_bond_type = mol_bond_type.title() if mol_bond_type else ''
+
+        # Check bonds array if available
+        bonds = molecule.get('Bonds', [])
+        if bonds:
+            for bond in bonds:
+                bond_type = bond.get('Type', '').title()
+                # Map common variations
+                if bond_type in ['Covalent', 'Single', 'Double', 'Triple']:
+                    if 'Covalent' in self.bond_type_filters:
+                        return True
+                elif bond_type == 'Ionic':
+                    if 'Ionic' in self.bond_type_filters:
+                        return True
+                elif 'polar' in bond_type.lower() and 'covalent' in bond_type.lower():
+                    if 'Polar Covalent' in self.bond_type_filters:
+                        return True
+
+        # Check direct bond_type field
+        if normalized_bond_type:
+            if normalized_bond_type in self.bond_type_filters:
+                return True
+            # Handle "Polar Covalent" variations
+            if 'polar' in normalized_bond_type.lower() and 'covalent' in normalized_bond_type.lower():
+                if 'Polar Covalent' in self.bond_type_filters:
+                    return True
+
+        # If no specific bond type but we have covalent filter, treat covalent bonds as matching
+        if 'Covalent' in self.bond_type_filters:
+            return True
+
+        return len(self.bond_type_filters) == 3  # All selected, show everything
 
     def _update_layout(self):
         """Recalculate positions for all molecules"""
@@ -299,17 +480,14 @@ class MoleculeUnifiedTable(QWidget):
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, element)
 
     def _calculate_atom_positions(self, composition, geometry, cx, cy, radius):
-        """Calculate positions for atoms based on molecular geometry"""
-        positions = []
+        """Calculate positions for atoms based on molecular geometry with 3D rotation"""
+        positions_3d = []
         total_atoms = sum(c.get('Count', 1) for c in composition)
 
         if total_atoms == 0:
-            return positions
+            return []
 
-        # Calculate position for each atom type
-        angle_step = 2 * math.pi / max(total_atoms, 1)
-        current_angle = -math.pi / 2  # Start from top
-
+        # Generate initial 3D positions based on geometry
         atom_index = 0
         for comp in composition:
             element = comp.get('Element', '?')
@@ -327,24 +505,96 @@ class MoleculeUnifiedTable(QWidget):
             for i in range(count):
                 if total_atoms == 1:
                     # Single atom at center
-                    ax, ay = cx, cy
+                    x, y, z = 0, 0, 0
                 elif total_atoms == 2:
-                    # Linear arrangement
+                    # Linear arrangement along X-axis
                     offset = radius * 0.6 * (1 if atom_index == 0 else -1)
-                    ax, ay = cx + offset, cy
+                    x, y, z = offset, 0, 0
+                elif geometry == 'Tetrahedral' and total_atoms <= 5:
+                    # Tetrahedral arrangement
+                    if atom_index == 0:
+                        x, y, z = 0, 0, 0  # Central atom
+                    else:
+                        tet_angle = math.acos(-1/3)
+                        idx = atom_index - 1
+                        if idx == 0:
+                            x, y, z = 0, 0, radius * 0.6
+                        elif idx == 1:
+                            x = radius * 0.6 * math.sin(tet_angle)
+                            y = 0
+                            z = -radius * 0.6 * math.cos(tet_angle)
+                        elif idx == 2:
+                            x = -radius * 0.6 * math.sin(tet_angle) * math.cos(math.pi/3)
+                            y = radius * 0.6 * math.sin(tet_angle) * math.sin(math.pi/3)
+                            z = -radius * 0.6 * math.cos(tet_angle)
+                        else:
+                            x = -radius * 0.6 * math.sin(tet_angle) * math.cos(math.pi/3)
+                            y = -radius * 0.6 * math.sin(tet_angle) * math.sin(math.pi/3)
+                            z = -radius * 0.6 * math.cos(tet_angle)
+                elif geometry == 'Trigonal Pyramidal':
+                    # Pyramidal arrangement
+                    if atom_index == 0:
+                        x, y, z = 0, 0, radius * 0.2
+                    else:
+                        a = (atom_index - 1) * 2 * math.pi / 3 - math.pi/2
+                        x = radius * 0.5 * math.cos(a)
+                        y = radius * 0.5 * math.sin(a)
+                        z = -radius * 0.25
+                elif geometry == 'Trigonal Planar':
+                    # Triangle in XY plane
+                    if atom_index == 0:
+                        x, y, z = 0, 0, 0
+                    else:
+                        a = (atom_index - 1) * 2 * math.pi / 3 - math.pi/2
+                        x = radius * 0.55 * math.cos(a)
+                        y = radius * 0.55 * math.sin(a)
+                        z = 0
+                elif geometry == 'Bent':
+                    # V-shape with Z variation
+                    if atom_index == 0:
+                        x, y, z = 0, 0, 0
+                    else:
+                        angle = math.radians(104.5)
+                        a = -math.pi/2 + (atom_index - 1) * angle / max(total_atoms - 2, 1)
+                        x = radius * 0.6 * math.cos(a)
+                        y = radius * 0.6 * math.sin(a)
+                        z = radius * 0.1 * (atom_index - 1.5)
                 else:
-                    # Circular arrangement
-                    ax = cx + radius * 0.8 * math.cos(current_angle)
-                    ay = cy + radius * 0.8 * math.sin(current_angle)
-                    current_angle += angle_step
+                    # Default circular arrangement with Z variation
+                    angle_step = 2 * math.pi / max(total_atoms, 1)
+                    current_angle = atom_index * angle_step - math.pi / 2
+                    x = radius * 0.7 * math.cos(current_angle)
+                    y = radius * 0.7 * math.sin(current_angle)
+                    z = radius * 0.15 * math.sin(atom_index * math.pi / 2)
 
-                positions.append({
+                positions_3d.append({
                     'element': element,
-                    'x': ax,
-                    'y': ay,
+                    'x': x,
+                    'y': y,
+                    'z': z,
                     'radius': base_radius
                 })
                 atom_index += 1
+
+        # Apply 3D rotation and project to 2D
+        positions = []
+        for atom in positions_3d:
+            x_rot, y_rot, z_rot = rotate_point_3d(
+                atom['x'], atom['y'], atom['z'],
+                self.pitch, self.yaw, self.roll
+            )
+            # Simple orthographic projection with depth-based scaling
+            depth_scale = 1.0 + z_rot / (radius * 4)  # Subtle perspective
+            positions.append({
+                'element': atom['element'],
+                'x': cx + x_rot,
+                'y': cy + y_rot,
+                'z': z_rot,
+                'radius': atom['radius'] * max(0.7, min(1.3, depth_scale))
+            })
+
+        # Sort by Z depth (draw far atoms first)
+        positions.sort(key=lambda p: p.get('z', 0))
 
         return positions
 
@@ -391,25 +641,47 @@ class MoleculeUnifiedTable(QWidget):
         painter.drawEllipse(QPointF(polarity_x, state_y), 5, 5)
 
     def mouseMoveEvent(self, event):
-        """Handle mouse movement for hover effects"""
-        # Transform mouse position
-        x = (event.position().x() - self.pan_x) / self.zoom_level
-        y = (event.position().y() - self.pan_y + self.scroll_offset_y) / self.zoom_level
+        """Handle mouse movement for panning and hover effects"""
+        if self.is_panning:
+            # Update pan offset
+            dx = event.position().x() - self.pan_start_x
+            dy = event.position().y() - self.pan_start_y
+            self.pan_x += dx
+            self.pan_y += dy
+            self.pan_start_x = event.position().x()
+            self.pan_start_y = event.position().y()
+            self.update()
+        else:
+            # Transform mouse position for hover detection
+            x = (event.position().x() - self.pan_x) / self.zoom_level
+            y = (event.position().y() - self.pan_y + self.scroll_offset_y) / self.zoom_level
 
-        layout = self.layouts.get(self.layout_mode)
-        if layout:
-            mol = layout.get_molecule_at_position(x, y, self.positioned_molecules)
+            layout = self.layouts.get(self.layout_mode)
+            if layout:
+                mol = layout.get_molecule_at_position(x, y, self.positioned_molecules)
 
-            if mol != self.hovered_molecule:
-                self.hovered_molecule = mol
-                if mol:
-                    self.molecule_hovered.emit(mol)
-                self.update()
+                if mol != self.hovered_molecule:
+                    self.hovered_molecule = mol
+                    if mol:
+                        self.molecule_hovered.emit(mol)
+                    self.update()
 
     def mousePressEvent(self, event):
-        """Handle mouse click for selection"""
-        if event.button() == Qt.MouseButton.LeftButton:
-            if self.hovered_molecule:
+        """Handle mouse click for selection and panning"""
+        if event.button() == Qt.MouseButton.MiddleButton:
+            # Middle button: start panning
+            self.is_panning = True
+            self.pan_start_x = event.position().x()
+            self.pan_start_y = event.position().y()
+            self.setCursor(Qt.CursorShape.ClosedHandCursor)
+        elif event.button() == Qt.MouseButton.LeftButton:
+            # Check for Ctrl+left click for panning
+            if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+                self.is_panning = True
+                self.pan_start_x = event.position().x()
+                self.pan_start_y = event.position().y()
+                self.setCursor(Qt.CursorShape.ClosedHandCursor)
+            elif self.hovered_molecule:
                 self.selected_molecule = self.hovered_molecule
                 self.molecule_selected.emit(self.selected_molecule)
                 # Copy molecule data to clipboard
@@ -417,17 +689,26 @@ class MoleculeUnifiedTable(QWidget):
                 QGuiApplication.clipboard().setText(clipboard_text)
                 self.update()
 
+    def mouseReleaseEvent(self, event):
+        """Handle mouse release"""
+        if event.button() == Qt.MouseButton.MiddleButton or event.button() == Qt.MouseButton.LeftButton:
+            if self.is_panning:
+                self.is_panning = False
+                self.setCursor(Qt.CursorShape.ArrowCursor)
+
     def wheelEvent(self, event):
-        """Handle scroll wheel for zooming/scrolling"""
+        """Handle scroll wheel for zooming (default) or scrolling (with Ctrl)"""
+        delta = event.angleDelta().y()
+
         if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-            # Zoom
-            delta = event.angleDelta().y()
-            factor = 1.1 if delta > 0 else 0.9
-            self.zoom_level = max(0.5, min(2.0, self.zoom_level * factor))
-        else:
-            # Scroll
-            delta = event.angleDelta().y()
+            # Ctrl+scroll: vertical scrolling
             self.scroll_offset_y = max(0, self.scroll_offset_y - delta / 2)
+        else:
+            # Default scroll: zoom in/out
+            if delta > 0:
+                self.zoom_level = min(5.0, self.zoom_level * 1.1)  # Zoom in
+            else:
+                self.zoom_level = max(0.2, self.zoom_level / 1.1)  # Zoom out
 
         self.update()
 
@@ -439,9 +720,104 @@ class MoleculeUnifiedTable(QWidget):
         self.scroll_offset_y = 0
         self.update()
 
+    def set_zoom(self, zoom_level):
+        """Set zoom level from external control (e.g., slider)
+
+        Args:
+            zoom_level: Zoom factor (0.2 to 5.0, where 1.0 is default)
+        """
+        self.zoom_level = max(0.2, min(5.0, zoom_level))
+        self.update()
+
     def get_content_height(self):
         """Get the total content height for scrolling"""
         layout = self.layouts.get(self.layout_mode)
         if layout and hasattr(layout, 'get_content_height'):
             return layout.get_content_height(self.positioned_molecules)
         return self.height()
+
+    def set_3d_mode(self, enabled):
+        """Enable or disable 3D molecular structure visualization.
+
+        Args:
+            enabled: Boolean to enable/disable 3D mode
+        """
+        self.show_3d_structure = getattr(self, 'show_3d_structure', False)
+        self.show_3d_structure = enabled
+        self.update()
+
+    def set_show_bonds(self, show):
+        """Toggle bond line visualization.
+
+        Args:
+            show: Boolean to show/hide bond lines
+        """
+        self.show_bonds = getattr(self, 'show_bonds', True)
+        self.show_bonds = show
+        self.update()
+
+    def set_show_labels(self, show):
+        """Toggle atom label visualization.
+
+        Args:
+            show: Boolean to show/hide atom labels
+        """
+        self.show_labels = getattr(self, 'show_labels', True)
+        self.show_labels = show
+        self.update()
+
+    def set_property_mapping(self, property_key, property_name):
+        """Set visual property mapping for a specific visual element.
+
+        Args:
+            property_key: Visual element key (fill_color, border_color, glow_color, symbol_text_color, border_size)
+            property_name: Data property name to map to the visual element
+        """
+        if not hasattr(self, 'property_mappings'):
+            self.property_mappings = {}
+        self.property_mappings[property_key] = property_name
+        self.update()
+
+    def set_property_filter_range(self, property_key, min_val, max_val):
+        """Set filter range for a property. Items outside the range will be grayed out.
+
+        Args:
+            property_key: Visual element key to filter by
+            min_val: Minimum value for the filter range
+            max_val: Maximum value for the filter range
+        """
+        if not hasattr(self, 'property_filter_ranges'):
+            self.property_filter_ranges = {}
+        self.property_filter_ranges[property_key] = (min_val, max_val)
+        self.update()
+
+    def set_gradient_colors(self, property_key, start_color, end_color):
+        """Set custom gradient colors for visual property encoding.
+
+        Args:
+            property_key: Visual element key to set gradient for
+            start_color: Start color of the gradient (hex string or QColor)
+            end_color: End color of the gradient (hex string or QColor)
+        """
+        if not hasattr(self, 'gradient_colors'):
+            self.gradient_colors = {}
+        self.gradient_colors[property_key] = (start_color, end_color)
+        self.update()
+
+    def set_fade_value(self, property_key, fade):
+        """Set fade value for items outside the filter range.
+
+        Args:
+            property_key: Visual element key to set fade for
+            fade: Fade value from 0.0 (no fade) to 1.0 (fully faded)
+        """
+        if not hasattr(self, 'fade_values'):
+            self.fade_values = {}
+        self.fade_values[property_key] = fade
+        self.update()
+
+    def reload_data(self):
+        """Reload molecule data from files and refresh the display"""
+        self.base_molecules = self.loader.load_all_molecules()
+        self._update_layout()
+        self.update()

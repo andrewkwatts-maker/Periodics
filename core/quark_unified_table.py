@@ -26,8 +26,8 @@ class QuarkUnifiedTable(QWidget):
     """Unified widget for displaying particle visualizations in multiple layouts"""
 
     # Signals
-    particle_selected = Signal(dict)  # Emitted when a particle is clicked
-    particle_hovered = Signal(dict)   # Emitted when a particle is hovered
+    quark_selected = Signal(dict)  # Emitted when a quark/particle is clicked
+    quark_hovered = Signal(dict)   # Emitted when a quark/particle is hovered
 
     def __init__(self):
         super().__init__()
@@ -44,8 +44,8 @@ class QuarkUnifiedTable(QWidget):
         self.current_renderer = None
 
         # Interaction state
-        self.hovered_particle = None
-        self.selected_particle = None
+        self.hovered_quark = None
+        self.selected_quark = None
 
         # Visual property mappings
         self.fill_property = "particle_type"
@@ -114,6 +114,18 @@ class QuarkUnifiedTable(QWidget):
         if not self.show_composites:
             filtered = [p for p in filtered if not p.get('is_composite', False)]
 
+        # Apply classification filter (quarks, leptons, bosons)
+        if hasattr(self, 'classification_filters'):
+            filtered = [p for p in filtered if self._passes_classification_filter(p)]
+
+        # Apply generation filter (1st, 2nd, 3rd generation)
+        if hasattr(self, 'generation_filters'):
+            filtered = [p for p in filtered if self._passes_generation_filter(p)]
+
+        # Apply charge type filter (positive, negative, neutral)
+        if hasattr(self, 'charge_type_filters'):
+            filtered = [p for p in filtered if self._passes_charge_type_filter(p)]
+
         # Create layout
         self.current_renderer = self.renderers.get(self.layout_mode)
         if self.current_renderer:
@@ -126,6 +138,64 @@ class QuarkUnifiedTable(QWidget):
             self.particles = filtered
 
         self.update()
+
+    def _passes_classification_filter(self, particle):
+        """Check if particle passes the classification filter"""
+        if not hasattr(self, 'classification_filters'):
+            return True
+
+        # Get particle type
+        ptype = particle.get('Type', '').lower()
+        particle_classification = particle.get('classification', '').lower()
+
+        # Determine classification
+        is_quark = 'quark' in ptype or particle_classification == 'quark'
+        is_lepton = 'lepton' in ptype or 'electron' in ptype or 'muon' in ptype or 'tau' in ptype or 'neutrino' in ptype or particle_classification == 'lepton'
+        is_boson = 'boson' in ptype or ptype in ['photon', 'gluon', 'z', 'w+', 'w-', 'higgs'] or particle_classification == 'boson'
+
+        # Check against filters
+        if is_quark and self.classification_filters.get('quark', True):
+            return True
+        if is_lepton and self.classification_filters.get('lepton', True):
+            return True
+        if is_boson and self.classification_filters.get('boson', True):
+            return True
+
+        # If none of the above matched but all filters are on, show it
+        if not is_quark and not is_lepton and not is_boson:
+            return all(self.classification_filters.values())
+
+        return False
+
+    def _passes_generation_filter(self, particle):
+        """Check if particle passes the generation filter"""
+        if not hasattr(self, 'generation_filters'):
+            return True
+
+        generation = particle.get('generation', particle.get('Generation', 0))
+
+        # If particle has no generation (like bosons), check if any generation filter is on
+        if generation == 0 or generation is None:
+            return any(self.generation_filters.values())
+
+        return self.generation_filters.get(generation, True)
+
+    def _passes_charge_type_filter(self, particle):
+        """Check if particle passes the charge type filter"""
+        if not hasattr(self, 'charge_type_filters'):
+            return True
+
+        charge = particle.get('Charge_e', particle.get('charge', 0))
+        if charge is None:
+            charge = 0
+
+        # Determine charge type
+        if charge > 0:
+            return self.charge_type_filters.get('positive', True)
+        elif charge < 0:
+            return self.charge_type_filters.get('negative', True)
+        else:
+            return self.charge_type_filters.get('neutral', True)
 
     def set_layout_mode(self, mode):
         """Set the layout mode"""
@@ -193,8 +263,8 @@ class QuarkUnifiedTable(QWidget):
             'border_property': self.border_property,
             'glow_property': self.glow_property,
             'order_property': self.order_property,
-            'hovered_particle': self.hovered_particle,
-            'selected_particle': self.selected_particle,
+            'hovered_quark': self.hovered_quark,
+            'selected_quark': self.selected_quark,
             'show_connections': self.show_connections
         }
 
@@ -258,17 +328,17 @@ class QuarkUnifiedTable(QWidget):
             return
 
         # Find particle under mouse
-        old_hovered = self.hovered_particle
-        self.hovered_particle = None
+        old_hovered = self.hovered_quark
+        self.hovered_quark = None
 
         if self.current_renderer:
-            self.hovered_particle = self.current_renderer.get_particle_at_position(
+            self.hovered_quark = self.current_renderer.get_particle_at_position(
                 x, y, self.particles
             )
 
-        if old_hovered != self.hovered_particle:
-            if self.hovered_particle:
-                self.particle_hovered.emit(self.hovered_particle)
+        if old_hovered != self.hovered_quark:
+            if self.hovered_quark:
+                self.quark_hovered.emit(self.hovered_quark)
             self.update()
 
     def mousePressEvent(self, event):
@@ -281,11 +351,11 @@ class QuarkUnifiedTable(QWidget):
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
         elif event.button() == Qt.MouseButton.LeftButton:
             # Select particle
-            if self.hovered_particle:
-                self.selected_particle = self.hovered_particle
-                self.particle_selected.emit(self.selected_particle)
+            if self.hovered_quark:
+                self.selected_quark = self.hovered_quark
+                self.quark_selected.emit(self.selected_quark)
                 # Copy particle data to clipboard
-                clipboard_text = json.dumps(self.selected_particle, indent=2, default=str)
+                clipboard_text = json.dumps(self.selected_quark, indent=2, default=str)
                 QGuiApplication.clipboard().setText(clipboard_text)
                 self.update()
 
@@ -317,4 +387,42 @@ class QuarkUnifiedTable(QWidget):
         self.zoom_level = 1.0
         self.pan_x = 0
         self.pan_y = 0
+        self.update()
+
+    def set_classification_filter(self, filters):
+        """Set classification filter (quarks, leptons, bosons)
+
+        Args:
+            filters: dict with keys 'quark', 'lepton', 'boson' mapping to booleans
+        """
+        if not hasattr(self, 'classification_filters'):
+            self.classification_filters = {'quark': True, 'lepton': True, 'boson': True}
+        self.classification_filters.update(filters)
+        self._update_layout()
+
+    def set_generation_filter(self, filters):
+        """Set generation filter (1st, 2nd, 3rd generation)
+
+        Args:
+            filters: dict with keys 1, 2, 3 mapping to booleans
+        """
+        if not hasattr(self, 'generation_filters'):
+            self.generation_filters = {1: True, 2: True, 3: True}
+        self.generation_filters.update(filters)
+        self._update_layout()
+
+    def set_charge_filter(self, filters):
+        """Set charge type filter (positive, negative, neutral)
+
+        Args:
+            filters: dict with keys 'positive', 'negative', 'neutral' mapping to booleans
+        """
+        if not hasattr(self, 'charge_type_filters'):
+            self.charge_type_filters = {'positive': True, 'negative': True, 'neutral': True}
+        self.charge_type_filters.update(filters)
+        self._update_layout()
+
+    def reload_data(self):
+        """Reload particle data from files and refresh the display"""
+        self.load_particle_data()
         self.update()

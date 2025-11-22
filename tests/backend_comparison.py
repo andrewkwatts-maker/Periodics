@@ -50,6 +50,8 @@ pure_genlaguerre = _pure_math.genlaguerre
 pure_lpmv = _pure_math.lpmv
 pure_double_factorial = _pure_math.double_factorial
 pure_binomial = _pure_math.binomial
+pure_spherical_harmonic = _pure_math.spherical_harmonic
+pure_spherical_harmonic_real = _pure_math.spherical_harmonic_real
 
 Vec3 = _pure_array.Vec3
 pure_pi = _pure_array.pi
@@ -59,6 +61,12 @@ pure_sin = _pure_array.sin
 pure_random_seed = _pure_array.random_seed
 pure_random_uniform = _pure_array.random_uniform
 pure_generate_nucleon_positions = _pure_array.generate_nucleon_positions
+pure_rotation_matrix_x = _pure_array.rotation_matrix_x
+pure_rotation_matrix_y = _pure_array.rotation_matrix_y
+pure_rotation_matrix_z = _pure_array.rotation_matrix_z
+pure_rotation_matrix_axis_angle = _pure_array.rotation_matrix_axis_angle
+pure_matrix_multiply_3x3 = _pure_array.matrix_multiply_3x3
+pure_matrix_vector_multiply = _pure_array.matrix_vector_multiply_3x3
 
 # =============================================================================
 # Try to import scipy/numpy for comparison
@@ -678,6 +686,213 @@ def test_orbital_probability() -> Optional[AccuracyResult]:
     )
 
 
+def test_spherical_harmonics() -> Optional[AccuracyResult]:
+    """Test spherical harmonics accuracy against scipy"""
+    if not SCIPY_AVAILABLE:
+        return None
+
+    max_rel_error = 0.0
+    max_abs_error = 0.0
+    tests_run = 0
+
+    # Test parameters: (l, m)
+    test_cases = [
+        (0, 0),   # s orbital
+        (1, -1), (1, 0), (1, 1),  # p orbitals
+        (2, -2), (2, -1), (2, 0), (2, 1), (2, 2),  # d orbitals
+        (3, -3), (3, -2), (3, -1), (3, 0), (3, 1), (3, 2), (3, 3),  # f orbitals
+    ]
+
+    theta_values = [0.0, math.pi / 6, math.pi / 4, math.pi / 3, math.pi / 2,
+                   2 * math.pi / 3, 3 * math.pi / 4, math.pi]
+    phi_values = [0.0, math.pi / 4, math.pi / 2, math.pi, 3 * math.pi / 2]
+
+    for l, m in test_cases:
+        for theta in theta_values:
+            for phi in phi_values:
+                # Pure Python implementation
+                pure_result = pure_spherical_harmonic(l, m, theta, phi)
+                pure_magnitude = abs(pure_result)
+
+                # scipy implementation (note: different argument order!)
+                # scipy.special.sph_harm(m, l, phi, theta)
+                scipy_result = scipy.special.sph_harm(m, l, phi, theta)
+                scipy_magnitude = abs(scipy_result)
+
+                if scipy_magnitude > 1e-10:
+                    rel_err = abs(pure_magnitude - scipy_magnitude) / scipy_magnitude
+                else:
+                    rel_err = abs(pure_magnitude - scipy_magnitude)
+
+                abs_err = abs(pure_magnitude - scipy_magnitude)
+
+                max_rel_error = max(max_rel_error, rel_err)
+                max_abs_error = max(max_abs_error, abs_err)
+                tests_run += 1
+
+    return AccuracyResult(
+        "spherical_harmonic vs scipy.sph_harm",
+        tests_run, max_rel_error, max_abs_error, threshold=1e-8
+    )
+
+
+def test_rotation_matrices() -> AccuracyResult:
+    """Test rotation matrix implementations against known values"""
+    max_rel_error = 0.0
+    max_abs_error = 0.0
+    tests_run = 0
+
+    # Test rotation matrices with known vector transformations
+    test_angles = [0, math.pi / 6, math.pi / 4, math.pi / 3, math.pi / 2, math.pi]
+
+    for angle in test_angles:
+        # Test X rotation: rotating Y axis should give (0, cos, sin)
+        Rx = pure_rotation_matrix_x(angle)
+        v_y = (0.0, 1.0, 0.0)
+        result = pure_matrix_vector_multiply(Rx, v_y)
+        expected = (0.0, math.cos(angle), math.sin(angle))
+
+        for r, e in zip(result, expected):
+            if abs(e) > 1e-10:
+                rel_err = abs(r - e) / abs(e)
+            else:
+                rel_err = abs(r)
+            abs_err = abs(r - e)
+            max_rel_error = max(max_rel_error, rel_err)
+            max_abs_error = max(max_abs_error, abs_err)
+        tests_run += 1
+
+        # Test Y rotation: rotating X axis should give (cos, 0, -sin)
+        Ry = pure_rotation_matrix_y(angle)
+        v_x = (1.0, 0.0, 0.0)
+        result = pure_matrix_vector_multiply(Ry, v_x)
+        expected = (math.cos(angle), 0.0, -math.sin(angle))
+
+        for r, e in zip(result, expected):
+            if abs(e) > 1e-10:
+                rel_err = abs(r - e) / abs(e)
+            else:
+                rel_err = abs(r)
+            abs_err = abs(r - e)
+            max_rel_error = max(max_rel_error, rel_err)
+            max_abs_error = max(max_abs_error, abs_err)
+        tests_run += 1
+
+        # Test Z rotation: rotating X axis should give (cos, sin, 0)
+        Rz = pure_rotation_matrix_z(angle)
+        result = pure_matrix_vector_multiply(Rz, v_x)
+        expected = (math.cos(angle), math.sin(angle), 0.0)
+
+        for r, e in zip(result, expected):
+            if abs(e) > 1e-10:
+                rel_err = abs(r - e) / abs(e)
+            else:
+                rel_err = abs(r)
+            abs_err = abs(r - e)
+            max_rel_error = max(max_rel_error, rel_err)
+            max_abs_error = max(max_abs_error, abs_err)
+        tests_run += 1
+
+    # Test axis-angle rotation
+    # Rotating around Z axis should match Rz
+    for angle in test_angles:
+        R_axis = pure_rotation_matrix_axis_angle((0, 0, 1), angle)
+        Rz = pure_rotation_matrix_z(angle)
+
+        for i in range(3):
+            for j in range(3):
+                diff = abs(R_axis[i][j] - Rz[i][j])
+                max_abs_error = max(max_abs_error, diff)
+                if abs(Rz[i][j]) > 1e-10:
+                    rel_err = diff / abs(Rz[i][j])
+                    max_rel_error = max(max_rel_error, rel_err)
+        tests_run += 1
+
+    # Test rotation matrix orthogonality: R * R^T = I
+    for angle in test_angles:
+        Rx = pure_rotation_matrix_x(angle)
+        Rx_T = [[Rx[j][i] for j in range(3)] for i in range(3)]  # Transpose
+        product = pure_matrix_multiply_3x3(Rx, Rx_T)
+
+        # Check if product is identity
+        for i in range(3):
+            for j in range(3):
+                expected = 1.0 if i == j else 0.0
+                diff = abs(product[i][j] - expected)
+                max_abs_error = max(max_abs_error, diff)
+                if expected != 0:
+                    rel_err = diff / abs(expected)
+                    max_rel_error = max(max_rel_error, rel_err)
+        tests_run += 1
+
+    return AccuracyResult(
+        "rotation_matrices (mathematical correctness)",
+        tests_run, max_rel_error, max_abs_error, threshold=1e-10
+    )
+
+
+def test_rotation_matrices_vs_numpy() -> Optional[AccuracyResult]:
+    """Test rotation matrices against numpy/scipy implementations"""
+    if not NUMPY_AVAILABLE:
+        return None
+
+    try:
+        from scipy.spatial.transform import Rotation
+    except ImportError:
+        return None
+
+    max_rel_error = 0.0
+    max_abs_error = 0.0
+    tests_run = 0
+
+    test_angles = [0, math.pi / 6, math.pi / 4, math.pi / 3, math.pi / 2, math.pi]
+
+    for angle in test_angles:
+        # Compare X rotation
+        pure_Rx = pure_rotation_matrix_x(angle)
+        scipy_Rx = Rotation.from_euler('x', angle).as_matrix()
+
+        for i in range(3):
+            for j in range(3):
+                diff = abs(pure_Rx[i][j] - scipy_Rx[i][j])
+                max_abs_error = max(max_abs_error, diff)
+                if abs(scipy_Rx[i][j]) > 1e-10:
+                    rel_err = diff / abs(scipy_Rx[i][j])
+                    max_rel_error = max(max_rel_error, rel_err)
+        tests_run += 1
+
+        # Compare Y rotation
+        pure_Ry = pure_rotation_matrix_y(angle)
+        scipy_Ry = Rotation.from_euler('y', angle).as_matrix()
+
+        for i in range(3):
+            for j in range(3):
+                diff = abs(pure_Ry[i][j] - scipy_Ry[i][j])
+                max_abs_error = max(max_abs_error, diff)
+                if abs(scipy_Ry[i][j]) > 1e-10:
+                    rel_err = diff / abs(scipy_Ry[i][j])
+                    max_rel_error = max(max_rel_error, rel_err)
+        tests_run += 1
+
+        # Compare Z rotation
+        pure_Rz = pure_rotation_matrix_z(angle)
+        scipy_Rz = Rotation.from_euler('z', angle).as_matrix()
+
+        for i in range(3):
+            for j in range(3):
+                diff = abs(pure_Rz[i][j] - scipy_Rz[i][j])
+                max_abs_error = max(max_abs_error, diff)
+                if abs(scipy_Rz[i][j]) > 1e-10:
+                    rel_err = diff / abs(scipy_Rz[i][j])
+                    max_rel_error = max(max_rel_error, rel_err)
+        tests_run += 1
+
+    return AccuracyResult(
+        "rotation_matrices vs scipy.spatial.transform",
+        tests_run, max_rel_error, max_abs_error, threshold=1e-10
+    )
+
+
 def test_sdf_nucleon_positions() -> Optional[AccuracyResult]:
     """Test that SDF renderer nucleon generation matches between backends"""
     if not NUMPY_AVAILABLE:
@@ -1032,6 +1247,9 @@ def run_accuracy_tests() -> List[AccuracyResult]:
         ("Factorial", test_factorial_accuracy),
         ("GenLaguerre", test_genlaguerre_accuracy),
         ("LPMV", test_lpmv_accuracy),
+        ("Spherical Harmonics", test_spherical_harmonics),
+        ("Rotation Matrices", test_rotation_matrices),
+        ("Rotation Matrices vs NumPy", test_rotation_matrices_vs_numpy),
         ("Vec3 Operations", test_vec3_operations),
         ("Vec3 vs NumPy", test_vec3_vs_numpy),
         ("Nucleon Consistency", test_nucleon_positions_consistency),
