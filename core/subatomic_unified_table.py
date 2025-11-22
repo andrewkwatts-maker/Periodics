@@ -896,6 +896,36 @@ class SubatomicUnifiedTable(QWidget):
         self.zoom_level = max(0.2, min(5.0, zoom_level))
         self.update()
 
+    def set_gradient_colors(self, property_key, start_color, end_color):
+        """Set custom gradient colors for a visual property encoding.
+
+        Args:
+            property_key: Visual encoding key (e.g., 'fill_color', 'border_color')
+            start_color: Starting color (QColor or hex string)
+            end_color: Ending color (QColor or hex string)
+        """
+        # Store custom gradient colors for use in rendering
+        if not hasattr(self, 'custom_gradients'):
+            self.custom_gradients = {}
+        self.custom_gradients[property_key] = {
+            'start': start_color if isinstance(start_color, str) else start_color.name(),
+            'end': end_color if isinstance(end_color, str) else end_color.name()
+        }
+        self.update()
+
+    def set_fade_value(self, property_key, fade_value):
+        """Set the fade amount for a visual property encoding.
+
+        Args:
+            property_key: Visual encoding key (e.g., 'fill_color', 'border_color')
+            fade_value: Fade amount from 0.0 (no fade) to 1.0 (fully transparent)
+        """
+        # Store fade values for use in rendering
+        if not hasattr(self, 'fade_values'):
+            self.fade_values = {}
+        self.fade_values[property_key] = max(0.0, min(1.0, fade_value))
+        self.update()
+
     def reload_data(self):
         """Reload particle data from files and refresh the display"""
         self.particles = self.loader.get_all_particles()

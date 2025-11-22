@@ -439,6 +439,25 @@ class UnifiedTable(QWidget):
             setattr(self, attr_name, max(0.0, min(1.0, fade_value)))
             self.update()
 
+    def reset_view(self):
+        """Reset zoom and pan to default values.
+
+        This restores the view to its initial state with no zoom or panning applied.
+        """
+        self.zoom_level = 1.0
+        self.pan_x = 0
+        self.pan_y = 0
+        self.update()
+
+    def set_zoom(self, zoom_level):
+        """Set the zoom level for the view.
+
+        Args:
+            zoom_level: Zoom factor where 1.0 is 100%, 2.0 is 200%, etc.
+        """
+        self.zoom_level = max(0.1, min(10.0, zoom_level))
+        self.update()
+
     def create_element_data(self):
         """Create base element data from JSON files"""
         # Get the element data loader (loads from JSON files)
