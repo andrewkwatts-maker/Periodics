@@ -1,2 +1,10 @@
+copyright (c) 2025 Andrew Keith Watts. All rights reserved.
+
+This is the intellectual property of Andrew Keith Watts. Unauthorized
+reproduction, distribution, or modification of this material, in whole or in part,
+without the express written permission of Andrew Keith Watts is strictly prohibited.
+
+For inquiries, please contact AndrewKWatts@Gmail.com
+
 # Periodics
 Alternative Periodic Table Visualizations
