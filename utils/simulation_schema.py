@@ -730,6 +730,26 @@ def propagate_quark_to_hadron(quarks: List[Dict]) -> HadronSimulationData:
     return hadron
 
 
+# Tabulated experimental data for light nuclei (A <= 4)
+# The Weizsacker semi-empirical mass formula doesn't work well for these
+# Format: (Z, N) -> (atomic_mass_amu, binding_energy_MeV)
+LIGHT_NUCLEI_DATA = {
+    # Hydrogen isotopes
+    (1, 0): (1.00783, 0.0),        # H-1 (protium) - single proton, no binding
+    (1, 1): (2.01410, 2.22),       # H-2 (deuterium)
+    (1, 2): (3.01605, 8.48),       # H-3 (tritium)
+    # Helium isotopes
+    (2, 1): (3.01603, 7.72),       # He-3
+    (2, 2): (4.00260, 28.30),      # He-4 (alpha particle) - doubly magic
+    # Lithium isotopes (included for completeness of very light nuclei)
+    (3, 3): (6.01512, 31.99),      # Li-6
+    (3, 4): (7.01600, 39.24),      # Li-7
+    # Beryllium
+    (4, 4): (8.00531, 56.50),      # Be-8 (unstable but useful for calculations)
+    (4, 5): (9.01218, 58.16),      # Be-9
+}
+
+
 def propagate_hadrons_to_atom(
     protons: int,
     neutrons: int,
@@ -739,7 +759,8 @@ def propagate_hadrons_to_atom(
 ) -> AtomSimulationData:
     """
     Calculate all atomic properties from constituent hadrons.
-    Uses Weizsacker mass formula and quantum mechanics.
+    Uses tabulated values for light nuclei (A <= 4) and Weizsacker mass
+    formula for heavier nuclei.
     """
     atom = AtomSimulationData()
 
@@ -755,34 +776,44 @@ def propagate_hadrons_to_atom(
 
     # Nuclear radius (fm)
     r0 = 1.2  # fm
-    atom.nuclear_radius_fm = r0 * (A ** (1/3))
+    atom.nuclear_radius_fm = r0 * (A ** (1/3)) if A > 0 else 0
 
-    # Binding energy (Weizsacker formula)
-    av, as_, ac, aa, ap = 15.75, 17.8, 0.711, 23.7, 11.2
-
-    volume = av * A
-    surface = -as_ * (A ** (2/3))
-    coulomb = -ac * Z * (Z - 1) / (A ** (1/3))
-    asymmetry = -aa * ((N - Z) ** 2) / A
-
-    # Pairing term
-    if Z % 2 == 0 and N % 2 == 0:
-        pairing = ap / (A ** 0.5)
-    elif Z % 2 == 1 and N % 2 == 1:
-        pairing = -ap / (A ** 0.5)
-    else:
-        pairing = 0
-
-    atom.nuclear_binding_energy_MeV = volume + surface + coulomb + asymmetry + pairing
-
-    # Atomic mass
-    proton_mass = proton_data.get('Mass_amu', 1.007276) if proton_data else 1.007276
-    neutron_mass = neutron_data.get('Mass_amu', 1.008665) if neutron_data else 1.008665
+    # Electron mass constant
     electron_mass = 0.000548579
 
-    mass_defect = atom.nuclear_binding_energy_MeV / 931.494
-    atom.atomic_mass_amu = Z * proton_mass + N * neutron_mass - mass_defect
-    atom.nuclear_mass_amu = atom.atomic_mass_amu - electrons * electron_mass
+    # Check if we have tabulated data for light nuclei
+    if (Z, N) in LIGHT_NUCLEI_DATA:
+        # Use experimental values for light nuclei
+        atomic_mass, binding_energy = LIGHT_NUCLEI_DATA[(Z, N)]
+        atom.nuclear_binding_energy_MeV = binding_energy
+        atom.atomic_mass_amu = atomic_mass
+        atom.nuclear_mass_amu = atomic_mass - electrons * electron_mass
+    else:
+        # Use Weizsacker semi-empirical mass formula for heavier nuclei
+        av, as_, ac, aa, ap = 15.75, 17.8, 0.711, 23.7, 11.2
+
+        volume = av * A
+        surface = -as_ * (A ** (2/3)) if A > 0 else 0
+        coulomb = -ac * Z * (Z - 1) / (A ** (1/3)) if A > 0 else 0
+        asymmetry = -aa * ((N - Z) ** 2) / A if A > 0 else 0
+
+        # Pairing term
+        if Z % 2 == 0 and N % 2 == 0:
+            pairing = ap / (A ** 0.5) if A > 0 else 0
+        elif Z % 2 == 1 and N % 2 == 1:
+            pairing = -ap / (A ** 0.5) if A > 0 else 0
+        else:
+            pairing = 0
+
+        atom.nuclear_binding_energy_MeV = volume + surface + coulomb + asymmetry + pairing
+
+        # Atomic mass calculation
+        proton_mass = proton_data.get('Mass_amu', 1.007276) if proton_data else 1.007276
+        neutron_mass = neutron_data.get('Mass_amu', 1.008665) if neutron_data else 1.008665
+
+        mass_defect = atom.nuclear_binding_energy_MeV / 931.494
+        atom.atomic_mass_amu = Z * proton_mass + N * neutron_mass - mass_defect
+        atom.nuclear_mass_amu = atom.atomic_mass_amu - electrons * electron_mass
 
     return atom
 
