@@ -1,0 +1,28 @@
+{
+    "Name": "Carbon Dioxide",
+    "Formula": "CO2",
+    "MolecularMass_amu": 44.01,
+    "MolecularMass_g_mol": 44.01,
+    "BondType": "Covalent",
+    "Geometry": "Linear",
+    "BondAngle_deg": 180.0,
+    "Polarity": "Nonpolar",
+    "MeltingPoint_K": 194.65,
+    "BoilingPoint_K": 216.55,
+    "Density_g_cm3": 0.001977,
+    "State_STP": "Gas",
+    "Composition": [
+        {"Element": "C", "Count": 1},
+        {"Element": "O", "Count": 2}
+    ],
+    "Bonds": [
+        {"From": "C", "To": "O", "Type": "Double", "Length_pm": 116, "Index": 1},
+        {"From": "C", "To": "O", "Type": "Double", "Length_pm": 116, "Index": 2}
+    ],
+    "DipoleMoment_D": 0.0,
+    "ElectronConfiguration": "C: 1s2 2s2 2p2, O: 1s2 2s2 2p4",
+    "Applications": ["Carbonation", "Fire extinguishers", "Photosynthesis", "Dry ice"],
+    "IUPAC_Name": "Carbon dioxide",
+    "Category": "Inorganic",
+    "Color": "#90A4AE"
+}
