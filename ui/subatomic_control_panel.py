@@ -1,16 +1,383 @@
 """
 Control Panel for Subatomic Particles Tab
 Provides UI controls for layout mode, property mappings, and filters
+Polished to match the Atoms tab feature set
 """
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox,
                                 QScrollArea, QRadioButton, QComboBox, QCheckBox,
-                                QPushButton, QFrame)
-from PySide6.QtCore import Qt, Signal
+                                QPushButton, QFrame, QSlider, QToolButton)
+from PySide6.QtCore import Qt, QPropertyAnimation, Signal
 from PySide6.QtGui import QFont
 
 from core.subatomic_enums import SubatomicLayoutMode, SubatomicProperty, ParticleCategory
 from data.data_manager import get_data_manager, DataCategory
+from ui.components import UnifiedPropertyMappingWidget
+
+
+class CollapsibleBox(QWidget):
+    """A collapsible widget that can expand/collapse its content"""
+    def __init__(self, title="", border_color="#4fc3f7", parent=None):
+        super().__init__(parent)
+
+        self.toggle_button = QToolButton()
+        self.toggle_button.setStyleSheet(f"""
+            QToolButton {{
+                border: none;
+                color: white;
+                font-weight: bold;
+                text-align: left;
+                padding: 5px;
+            }}
+        """)
+        self.toggle_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.toggle_button.setArrowType(Qt.ArrowType.RightArrow)
+        self.toggle_button.setText(title)
+        self.toggle_button.setCheckable(True)
+        self.toggle_button.setChecked(False)
+        self.toggle_button.clicked.connect(self.on_toggle)
+
+        self.content_area = QFrame()
+        self.content_area.setMaximumHeight(0)
+        self.content_area.setMinimumHeight(0)
+        self.content_area.setStyleSheet(f"""
+            QFrame {{
+                border: none;
+                background: transparent;
+                padding: 5px;
+            }}
+        """)
+
+        self.content_layout = QVBoxLayout()
+        self.content_layout.setContentsMargins(10, 10, 10, 10)
+        self.content_area.setLayout(self.content_layout)
+
+        main_layout = QVBoxLayout()
+        main_layout.setSpacing(0)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addWidget(self.toggle_button)
+        main_layout.addWidget(self.content_area)
+        self.setLayout(main_layout)
+
+        self.toggle_animation = QPropertyAnimation(self.content_area, b"maximumHeight")
+        self.toggle_animation.setDuration(200)
+
+    def on_toggle(self):
+        """Toggle the expanded/collapsed state"""
+        checked = self.toggle_button.isChecked()
+        arrow_type = Qt.ArrowType.DownArrow if checked else Qt.ArrowType.RightArrow
+        self.toggle_button.setArrowType(arrow_type)
+
+        if checked:
+            # Expand - use animation to grow, then remove max height constraint
+            content_height = self.content_area.sizeHint().height()
+            self.toggle_animation.setStartValue(0)
+            self.toggle_animation.setEndValue(content_height)
+            self.toggle_animation.finished.connect(self._on_expand_finished)
+            self.toggle_animation.start()
+        else:
+            # Collapse
+            self.content_area.setMaximumHeight(self.content_area.height())
+            self.toggle_animation.setStartValue(self.content_area.height())
+            self.toggle_animation.setEndValue(0)
+            self.toggle_animation.start()
+
+    def _on_expand_finished(self):
+        """Remove height constraint after expand animation completes"""
+        self.content_area.setMaximumHeight(16777215)  # QWIDGETSIZE_MAX
+        try:
+            self.toggle_animation.finished.disconnect(self._on_expand_finished)
+        except RuntimeError:
+            pass  # Already disconnected
+
+
+class SubatomicPropertyControl(QWidget):
+    """Expandable control for a single visual property with range controls and filtering"""
+    def __init__(self, title, property_key, parent_panel, available_properties, control_type="color", default_index=0):
+        super().__init__()
+        self.property_key = property_key
+        self.parent_panel = parent_panel
+        self.control_type = control_type
+        self.is_expanded = False
+        self.default_index = default_index
+        self.user_selected_index = default_index
+
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(5, 3, 5, 3)
+        main_layout.setSpacing(3)
+
+        # Header with expand/collapse and property selector
+        header = QWidget()
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(5)
+
+        self.expand_btn = QToolButton()
+        self.expand_btn.setArrowType(Qt.ArrowType.RightArrow)
+        self.expand_btn.setStyleSheet("QToolButton { border: none; color: white; }")
+        self.expand_btn.clicked.connect(self.toggle_expanded)
+        header_layout.addWidget(self.expand_btn)
+
+        title_label = QLabel(title + ":")
+        title_label.setStyleSheet("color: white; font-weight: bold; font-size: 10px;")
+        title_label.setMinimumWidth(110)
+        header_layout.addWidget(title_label)
+
+        self.property_combo = QComboBox()
+        self.property_combo.addItems(available_properties)
+        self.property_combo.setStyleSheet(self._get_combo_style())
+        self.property_combo.currentIndexChanged.connect(self.on_property_selection_changed)
+        self.available_properties = available_properties
+        header_layout.addWidget(self.property_combo, 1)
+
+        # "Use Default" checkbox
+        self.use_default_checkbox = QCheckBox("Default")
+        self.use_default_checkbox.setStyleSheet("""
+            QCheckBox {
+                color: rgba(255,255,255,200);
+                font-size: 9px;
+                spacing: 3px;
+            }
+            QCheckBox::indicator {
+                width: 14px;
+                height: 14px;
+                border: 1px solid #667eea;
+                border-radius: 3px;
+                background: rgba(40, 40, 60, 150);
+            }
+            QCheckBox::indicator:checked {
+                background: #667eea;
+            }
+        """)
+        self.use_default_checkbox.toggled.connect(self.on_use_default_toggled)
+        header_layout.addWidget(self.use_default_checkbox)
+
+        main_layout.addWidget(header)
+
+        # Expandable details area
+        self.details_widget = QWidget()
+        self.details_widget.setVisible(False)
+        details_layout = QVBoxLayout(self.details_widget)
+        details_layout.setContentsMargins(25, 5, 5, 5)
+        details_layout.setSpacing(8)
+
+        # Unified property mapping widget
+        mapping_label = QLabel("Property Mapping & Filtering:")
+        mapping_label.setStyleSheet("color: rgba(255,255,255,200); font-size: 9px; font-weight: bold;")
+        details_layout.addWidget(mapping_label)
+
+        self.unified_mapping = UnifiedPropertyMappingWidget(property_name="mass", property_type=control_type)
+        self.unified_mapping.color_range_changed.connect(self.on_unified_color_range_changed)
+        self.unified_mapping.filter_range_changed.connect(self.on_unified_filter_range_changed)
+        self.unified_mapping.gradient_colors_changed.connect(self.on_unified_gradient_colors_changed)
+        details_layout.addWidget(self.unified_mapping)
+
+        # Fade slider (for color properties only)
+        if self.control_type == "color":
+            fade_container = QWidget()
+            fade_layout = QHBoxLayout(fade_container)
+            fade_layout.setContentsMargins(0, 5, 0, 0)
+            fade_layout.setSpacing(5)
+
+            fade_label = QLabel("Fade:")
+            fade_label.setStyleSheet("color: rgba(255,255,255,180); font-size: 9px; min-width: 35px;")
+            fade_layout.addWidget(fade_label)
+
+            self.fade_slider = QSlider(Qt.Orientation.Horizontal)
+            self.fade_slider.setMinimum(0)
+            self.fade_slider.setMaximum(100)
+            self.fade_slider.setValue(0)
+            self.fade_slider.setStyleSheet(self._get_slider_style())
+            self.fade_slider.valueChanged.connect(self.on_fade_changed)
+            fade_layout.addWidget(self.fade_slider)
+
+            self.fade_display = QLabel("0%")
+            self.fade_display.setStyleSheet("color: rgba(255,255,255,180); font-size: 9px; min-width: 35px;")
+            fade_layout.addWidget(self.fade_display)
+
+            details_layout.addWidget(fade_container)
+
+        main_layout.addWidget(self.details_widget)
+
+        # Initialize with defaults
+        self.data_min = 0
+        self.data_max = 100
+        self.data_unit = ""
+        self.current_property_name = "none"
+
+    def on_unified_color_range_changed(self, min_map, max_map):
+        """Handle color mapping range change from unified widget"""
+        if hasattr(self, 'property_key') and hasattr(self.parent_panel, 'table'):
+            # Map property key to table attribute
+            attr_map = {
+                "fill_color": ("fill_property_min_map", "fill_property_max_map"),
+                "border_color": ("border_property_min_map", "border_property_max_map"),
+                "glow_color": ("glow_property_min_map", "glow_property_max_map"),
+                "ring_color": ("ring_property_min_map", "ring_property_max_map"),
+                "symbol_text_color": ("symbol_text_color_property_min_map", "symbol_text_color_property_max_map"),
+            }
+
+            if self.property_key in attr_map:
+                min_attr, max_attr = attr_map[self.property_key]
+                if hasattr(self.parent_panel.table, min_attr):
+                    setattr(self.parent_panel.table, min_attr, min_map)
+                if hasattr(self.parent_panel.table, max_attr):
+                    setattr(self.parent_panel.table, max_attr, max_map)
+                self.parent_panel.table.update()
+
+    def on_unified_gradient_colors_changed(self, start_color, end_color):
+        """Handle gradient color change from unified widget color pickers"""
+        if hasattr(self, 'property_key') and hasattr(self.parent_panel, 'table'):
+            gradient_attr_map = {
+                "fill_color": ("custom_fill_gradient_start", "custom_fill_gradient_end"),
+                "border_color": ("custom_border_gradient_start", "custom_border_gradient_end"),
+                "ring_color": ("custom_ring_gradient_start", "custom_ring_gradient_end"),
+                "glow_color": ("custom_glow_gradient_start", "custom_glow_gradient_end"),
+                "symbol_text_color": ("custom_symbol_text_gradient_start", "custom_symbol_text_gradient_end"),
+            }
+
+            if self.property_key in gradient_attr_map:
+                start_attr, end_attr = gradient_attr_map[self.property_key]
+                if hasattr(self.parent_panel.table, start_attr):
+                    setattr(self.parent_panel.table, start_attr, start_color)
+                if hasattr(self.parent_panel.table, end_attr):
+                    setattr(self.parent_panel.table, end_attr, end_color)
+                self.parent_panel.table.update()
+
+    def on_unified_filter_range_changed(self, min_filter, max_filter):
+        """Handle filter range change from unified widget"""
+        if self.current_property_name != "none" and hasattr(self.parent_panel, 'table'):
+            if hasattr(self.parent_panel.table, 'filters'):
+                if self.current_property_name not in self.parent_panel.table.filters:
+                    self.parent_panel.table.filters[self.current_property_name] = {}
+                self.parent_panel.table.filters[self.current_property_name]['min'] = min_filter
+                self.parent_panel.table.filters[self.current_property_name]['max'] = max_filter
+                self.parent_panel.table.filters[self.current_property_name]['active'] = self.unified_mapping.filter_enabled
+                self.parent_panel.table.update()
+
+    def on_property_selection_changed(self, idx):
+        """Handle property selection change - update ranges and call parent"""
+        property_display_name = self.available_properties[idx]
+        property_name = property_display_name.lower().replace(" ", "_").replace("(", "").replace(")", "").replace("/", "_").replace("^", "")
+        self.current_property_name = property_name
+
+        # Get metadata for subatomic properties
+        metadata = self._get_subatomic_property_metadata(property_name)
+        if metadata:
+            self.data_min = metadata.get("min_value", 0)
+            self.data_max = metadata.get("max_value", 100)
+            self.data_unit = metadata.get("unit", "")
+        else:
+            self.data_min = 0
+            self.data_max = 100
+            self.data_unit = ""
+
+        # Update the unified mapping widget
+        self.unified_mapping.set_property(property_name, self.control_type)
+        self.unified_mapping.set_value_range(self.data_min, self.data_max)
+        self.unified_mapping.set_color_map_range(self.data_min, self.data_max)
+        self.unified_mapping.set_filter_range(self.data_min, self.data_max)
+
+        # Call parent's handler
+        self.parent_panel.on_property_changed(self.property_key, idx)
+
+    def _get_subatomic_property_metadata(self, property_name):
+        """Get metadata for subatomic particle properties"""
+        metadata_map = {
+            "mass_mevc2": {"min_value": 0, "max_value": 12000, "unit": "MeV/c^2"},
+            "mass": {"min_value": 0, "max_value": 12000, "unit": "MeV/c^2"},
+            "charge_e": {"min_value": -2, "max_value": 2, "unit": "e"},
+            "charge": {"min_value": -2, "max_value": 2, "unit": "e"},
+            "electric_charge": {"min_value": -2, "max_value": 2, "unit": "e"},
+            "spin_hbar": {"min_value": 0, "max_value": 3.5, "unit": "h-bar"},
+            "spin": {"min_value": 0, "max_value": 3.5, "unit": "h-bar"},
+            "baryonnumber_b": {"min_value": -1, "max_value": 1, "unit": "B"},
+            "baryon_number": {"min_value": -1, "max_value": 1, "unit": "B"},
+            "isospin_i3": {"min_value": -1.5, "max_value": 1.5, "unit": "I3"},
+            "isospin": {"min_value": -1.5, "max_value": 1.5, "unit": "I3"},
+            "strangeness": {"min_value": -3, "max_value": 0, "unit": "S"},
+            "half_life": {"min_value": 0, "max_value": 1e-8, "unit": "s"},
+            "half-life": {"min_value": 0, "max_value": 1e-8, "unit": "s"},
+            "stability": {"min_value": 0, "max_value": 1, "unit": ""},
+            "quark_count": {"min_value": 2, "max_value": 3, "unit": ""},
+            "none": {"min_value": 0, "max_value": 100, "unit": ""},
+        }
+        return metadata_map.get(property_name, None)
+
+    def on_fade_changed(self, value):
+        """Handle fade slider change"""
+        self.fade_display.setText(f"{value}%")
+        if hasattr(self.parent_panel, 'table'):
+            fade_map = {
+                "fill_color": "fill_fade",
+                "border_color": "border_color_fade",
+                "ring_color": "ring_color_fade",
+                "glow_color": "glow_color_fade",
+                "symbol_text_color": "symbol_text_color_fade"
+            }
+            if self.property_key in fade_map:
+                attr = fade_map[self.property_key]
+                if hasattr(self.parent_panel.table, attr):
+                    setattr(self.parent_panel.table, attr, value / 100.0)
+                    self.parent_panel.table.update()
+
+    def toggle_expanded(self):
+        """Toggle expanded/collapsed state"""
+        self.is_expanded = not self.is_expanded
+        self.expand_btn.setArrowType(Qt.ArrowType.DownArrow if self.is_expanded else Qt.ArrowType.RightArrow)
+        self.details_widget.setVisible(self.is_expanded)
+
+    def on_use_default_toggled(self, checked):
+        """Toggle using default color/value for this property"""
+        self.property_combo.setEnabled(not checked)
+
+        if checked:
+            self.user_selected_index = self.property_combo.currentIndex()
+            self.property_combo.blockSignals(True)
+            self.property_combo.setCurrentIndex(self.default_index)
+            self.property_combo.blockSignals(False)
+            self.on_property_selection_changed(self.default_index)
+        else:
+            self.property_combo.blockSignals(True)
+            self.property_combo.setCurrentIndex(self.user_selected_index)
+            self.property_combo.blockSignals(False)
+            self.on_property_selection_changed(self.user_selected_index)
+
+        self.parent_panel.on_property_changed(self.property_key, self.property_combo.currentIndex())
+
+    def _get_combo_style(self):
+        return """
+            QComboBox {
+                background: rgba(40, 40, 60, 200);
+                color: white;
+                border: 1px solid #764ba2;
+                padding: 3px 5px;
+                border-radius: 3px;
+                font-size: 9px;
+            }
+            QComboBox::drop-down { border: none; }
+            QComboBox QAbstractItemView {
+                background: rgba(30, 30, 50, 250);
+                color: white;
+                selection-background-color: #764ba2;
+            }
+        """
+
+    def _get_slider_style(self):
+        return """
+            QSlider::groove:horizontal {
+                height: 4px;
+                background: rgba(60, 60, 80, 200);
+                border-radius: 2px;
+            }
+            QSlider::handle:horizontal {
+                background: #764ba2;
+                width: 12px;
+                height: 12px;
+                margin: -4px 0;
+                border-radius: 6px;
+            }
+        """
 
 
 class SubatomicControlPanel(QWidget):
@@ -55,14 +422,14 @@ class SubatomicControlPanel(QWidget):
         title.setStyleSheet("color: #4fc3f7;")
         layout.addWidget(title)
 
-        # Layout Mode Selection
+        # Layout Mode Selection (always expanded)
         layout.addWidget(self._create_layout_mode_group())
 
-        # Particle Type Filters
-        layout.addWidget(self._create_filter_group())
-
-        # Visual Property Encodings
+        # Visual Property Encodings (collapsible with full controls)
         layout.addWidget(self._create_visual_properties_group())
+
+        # Filter Options (collapsible)
+        layout.addWidget(self._create_filter_group())
 
         # View Controls
         layout.addWidget(self._create_view_controls_group())
@@ -79,7 +446,7 @@ class SubatomicControlPanel(QWidget):
         main_layout.addWidget(scroll)
 
     def _create_layout_mode_group(self):
-        """Create layout mode selection group"""
+        """Create layout mode selection group - always expanded"""
         layout_group = QGroupBox("Layout Mode")
         layout_group.setStyleSheet("""
             QGroupBox {
@@ -116,6 +483,7 @@ class SubatomicControlPanel(QWidget):
             }
         """
 
+        # Original 4 layout modes
         self.baryon_meson_radio = QRadioButton("Baryon/Meson Groups")
         self.baryon_meson_radio.setStyleSheet(radio_style)
         self.baryon_meson_radio.setChecked(True)
@@ -142,6 +510,7 @@ class SubatomicControlPanel(QWidget):
         self.quark_radio.toggled.connect(
             lambda: self._on_layout_changed(SubatomicLayoutMode.QUARK_CONTENT) if self.quark_radio.isChecked() else None)
 
+        # 4 New layout modes
         self.eightfold_radio = QRadioButton("Eightfold Way")
         self.eightfold_radio.setStyleSheet(radio_style)
         self.eightfold_radio.toggled.connect(
@@ -172,27 +541,127 @@ class SubatomicControlPanel(QWidget):
         layout_box.addWidget(self.quark_tree_radio)
         layout_box.addWidget(self.discovery_radio)
 
+        # Zoom controls info for all modes
+        zoom_info = QLabel("Camera Controls (All Modes):\n  Scroll wheel: Zoom\n  Middle-click or Ctrl+drag: Pan")
+        zoom_info.setStyleSheet("color: rgba(255,255,255,180); font-size: 9px; margin-top: 8px;")
+        zoom_info.setWordWrap(True)
+        layout_box.addWidget(zoom_info)
+
+        # Reset zoom button
+        reset_btn = QPushButton("Reset View")
+        reset_btn.clicked.connect(self._on_reset_view)
+        reset_btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(102, 126, 234, 150);
+                color: white;
+                border: none;
+                padding: 5px;
+                border-radius: 4px;
+                font-size: 10px;
+                margin-top: 5px;
+            }
+            QPushButton:hover {
+                background: rgba(102, 126, 234, 200);
+            }
+        """)
+        layout_box.addWidget(reset_btn)
+
         layout_group.setLayout(layout_box)
         return layout_group
 
-    def _create_filter_group(self):
-        """Create particle type filter group"""
-        filter_group = QGroupBox("Particle Filters")
-        filter_group.setStyleSheet("""
-            QGroupBox {
+    def _create_visual_properties_group(self):
+        """Create visual property encodings with expandable controls"""
+        collapsible = CollapsibleBox("Visual Property Encodings", "#764ba2")
+        properties_layout = QVBoxLayout()
+
+        # Available property options for subatomic particles
+        color_properties = [
+            "Mass (MeV/c^2)",
+            "Electric Charge",
+            "Spin",
+            "Half-Life",
+            "Strangeness",
+            "Isospin",
+            "Baryon Number",
+            "Stability",
+            "None"
+        ]
+
+        # 1. Fill Colour -> Mass_MeVc2 (index 0)
+        self.fill_color_control = SubatomicPropertyControl(
+            "Fill Colour", "fill_color", self, color_properties,
+            control_type="color", default_index=0)
+        self.fill_color_control.property_combo.setCurrentIndex(0)  # Mass
+        properties_layout.addWidget(self.fill_color_control)
+
+        # 2. Border Colour -> Charge_e (index 1)
+        self.border_color_control = SubatomicPropertyControl(
+            "Border Colour", "border_color", self, color_properties,
+            control_type="color", default_index=1)
+        self.border_color_control.property_combo.setCurrentIndex(1)  # Charge
+        properties_layout.addWidget(self.border_color_control)
+
+        # 3. Glow Colour -> Spin_hbar (index 2)
+        self.glow_color_control = SubatomicPropertyControl(
+            "Glow Colour", "glow_color", self, color_properties,
+            control_type="color", default_index=2)
+        self.glow_color_control.property_combo.setCurrentIndex(2)  # Spin
+        properties_layout.addWidget(self.glow_color_control)
+
+        # 4. Inner Ring Colour -> BaryonNumber_B (index 6)
+        self.ring_color_control = SubatomicPropertyControl(
+            "Inner Ring Colour", "ring_color", self, color_properties,
+            control_type="color", default_index=6)
+        self.ring_color_control.property_combo.setCurrentIndex(6)  # Baryon Number
+        properties_layout.addWidget(self.ring_color_control)
+
+        # 5. Symbol Text Colour -> Isospin_I3 (index 5)
+        self.symbol_text_color_control = SubatomicPropertyControl(
+            "Symbol Text Colour", "symbol_text_color", self, color_properties,
+            control_type="color", default_index=5)
+        self.symbol_text_color_control.property_combo.setCurrentIndex(5)  # Isospin
+        properties_layout.addWidget(self.symbol_text_color_control)
+
+        # Reset button to restore default mappings
+        reset_button = QPushButton("Reset to Defaults")
+        reset_button.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                           stop:0 #667eea, stop:1 #764ba2);
                 color: white;
-                border: 2px solid #764ba2;
-                border-radius: 8px;
-                margin-top: 10px;
-                padding: 10px;
+                border: none;
+                border-radius: 5px;
+                padding: 8px 16px;
                 font-weight: bold;
+                margin-top: 10px;
             }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px;
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                           stop:0 #7688f0, stop:1 #8658b8);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                           stop:0 #5567d0, stop:1 #653a92);
             }
         """)
+        reset_button.clicked.connect(self.reset_property_mappings)
+        properties_layout.addWidget(reset_button)
+
+        # Transfer to collapsible
+        while properties_layout.count():
+            item = properties_layout.takeAt(0)
+            if item.widget():
+                collapsible.content_layout.addWidget(item.widget())
+
+        # Open by default
+        collapsible.toggle_button.setChecked(True)
+        collapsible.on_toggle()
+
+        return collapsible
+
+    def _create_filter_group(self):
+        """Create particle type filter group (collapsible)"""
+        collapsible = CollapsibleBox("Filter Options", "#764ba2")
         layout = QVBoxLayout()
 
         checkbox_style = """
@@ -212,28 +681,49 @@ class SubatomicControlPanel(QWidget):
             }
         """
 
+        # Particle type section
+        type_label = QLabel("Particle Type:")
+        type_label.setStyleSheet("color: white; font-weight: bold; font-size: 10px;")
+        layout.addWidget(type_label)
+
         # Particle type checkboxes
         self.show_baryons_check = QCheckBox("Show Baryons")
         self.show_baryons_check.setStyleSheet(checkbox_style)
         self.show_baryons_check.setChecked(True)
         self.show_baryons_check.toggled.connect(self._on_filter_changed)
+        layout.addWidget(self.show_baryons_check)
 
         self.show_mesons_check = QCheckBox("Show Mesons")
         self.show_mesons_check.setStyleSheet(checkbox_style)
         self.show_mesons_check.setChecked(True)
         self.show_mesons_check.toggled.connect(self._on_filter_changed)
-
-        layout.addWidget(self.show_baryons_check)
         layout.addWidget(self.show_mesons_check)
 
-        # Charge filter
-        charge_layout = QHBoxLayout()
-        charge_label = QLabel("Charge Filter:")
-        charge_label.setStyleSheet("color: white;")
-        charge_layout.addWidget(charge_label)
+        # Stability filter section
+        stability_label = QLabel("Stability:")
+        stability_label.setStyleSheet("color: white; font-weight: bold; font-size: 10px; margin-top: 10px;")
+        layout.addWidget(stability_label)
 
+        self.show_stable_check = QCheckBox("Show Stable")
+        self.show_stable_check.setStyleSheet(checkbox_style)
+        self.show_stable_check.setChecked(True)
+        self.show_stable_check.toggled.connect(self._on_filter_changed)
+        layout.addWidget(self.show_stable_check)
+
+        self.show_unstable_check = QCheckBox("Show Unstable")
+        self.show_unstable_check.setStyleSheet(checkbox_style)
+        self.show_unstable_check.setChecked(True)
+        self.show_unstable_check.toggled.connect(self._on_filter_changed)
+        layout.addWidget(self.show_unstable_check)
+
+        # Charge filter section
+        charge_label = QLabel("Charge Filter:")
+        charge_label.setStyleSheet("color: white; font-weight: bold; font-size: 10px; margin-top: 10px;")
+        layout.addWidget(charge_label)
+
+        charge_layout = QHBoxLayout()
         self.charge_combo = QComboBox()
-        self.charge_combo.addItems(["All", "+2", "+1", "0", "-1"])
+        self.charge_combo.addItems(["All", "+2", "+1", "0", "-1", "-2"])
         self.charge_combo.setStyleSheet("""
             QComboBox {
                 background: rgba(40, 40, 60, 200);
@@ -251,87 +741,24 @@ class SubatomicControlPanel(QWidget):
         """)
         self.charge_combo.currentIndexChanged.connect(self._on_charge_filter_changed)
         charge_layout.addWidget(self.charge_combo)
-
+        charge_layout.addStretch()
         layout.addLayout(charge_layout)
 
-        filter_group.setLayout(layout)
-        return filter_group
+        # Transfer widgets to collapsible box
+        while layout.count():
+            item = layout.takeAt(0)
+            if item.widget():
+                collapsible.content_layout.addWidget(item.widget())
+            elif item.layout():
+                container = QWidget()
+                container.setLayout(item.layout())
+                collapsible.content_layout.addWidget(container)
 
-    def _create_visual_properties_group(self):
-        """Create visual property encoding controls"""
-        props_group = QGroupBox("Visual Encodings")
-        props_group.setStyleSheet("""
-            QGroupBox {
-                color: white;
-                border: 2px solid #f093fb;
-                border-radius: 8px;
-                margin-top: 10px;
-                padding: 10px;
-                font-weight: bold;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px;
-            }
-        """)
-        layout = QVBoxLayout()
+        # Open by default
+        collapsible.toggle_button.setChecked(True)
+        collapsible.on_toggle()
 
-        combo_style = """
-            QComboBox {
-                background: rgba(40, 40, 60, 200);
-                color: white;
-                border: 1px solid #f093fb;
-                padding: 5px;
-                border-radius: 4px;
-            }
-            QComboBox::drop-down { border: none; }
-            QComboBox QAbstractItemView {
-                background: rgba(30, 30, 50, 250);
-                color: white;
-                selection-background-color: #f093fb;
-            }
-        """
-
-        # Property options
-        property_options = ["Mass", "Charge", "Spin", "Half-Life", "Stability", "None"]
-
-        # Card Color encoding
-        color_layout = QHBoxLayout()
-        color_label = QLabel("Card Glow:")
-        color_label.setStyleSheet("color: white; min-width: 80px;")
-        color_layout.addWidget(color_label)
-
-        self.color_combo = QComboBox()
-        self.color_combo.addItems(property_options)
-        self.color_combo.setCurrentIndex(4)  # Stability
-        self.color_combo.setStyleSheet(combo_style)
-        self.color_combo.currentIndexChanged.connect(self._on_visual_property_changed)
-        color_layout.addWidget(self.color_combo)
-        layout.addLayout(color_layout)
-
-        # Border encoding
-        border_layout = QHBoxLayout()
-        border_label = QLabel("Border:")
-        border_label.setStyleSheet("color: white; min-width: 80px;")
-        border_layout.addWidget(border_label)
-
-        self.border_combo = QComboBox()
-        self.border_combo.addItems(property_options)
-        self.border_combo.setCurrentIndex(1)  # Charge
-        self.border_combo.setStyleSheet(combo_style)
-        self.border_combo.currentIndexChanged.connect(self._on_visual_property_changed)
-        border_layout.addWidget(self.border_combo)
-        layout.addLayout(border_layout)
-
-        # Info text
-        info_label = QLabel("Particles are automatically colored by their family type (Delta, Sigma, Pion, etc.)")
-        info_label.setStyleSheet("color: rgba(255,255,255,150); font-size: 9px;")
-        info_label.setWordWrap(True)
-        layout.addWidget(info_label)
-
-        props_group.setLayout(layout)
-        return props_group
+        return collapsible
 
     def _create_view_controls_group(self):
         """Create view control buttons"""
@@ -380,55 +807,6 @@ class SubatomicControlPanel(QWidget):
 
         view_group.setLayout(layout)
         return view_group
-
-    def _on_layout_changed(self, mode):
-        """Handle layout mode change"""
-        self.table.set_layout_mode(mode)
-
-    def _on_filter_changed(self):
-        """Handle filter checkbox change"""
-        self.table.set_filter(
-            show_baryons=self.show_baryons_check.isChecked(),
-            show_mesons=self.show_mesons_check.isChecked(),
-            charge=self._get_charge_filter()
-        )
-
-    def _on_charge_filter_changed(self, index):
-        """Handle charge filter combo change"""
-        self.table.set_filter(
-            show_baryons=self.show_baryons_check.isChecked(),
-            show_mesons=self.show_mesons_check.isChecked(),
-            charge=self._get_charge_filter()
-        )
-
-    def _get_charge_filter(self):
-        """Get current charge filter value"""
-        charge_text = self.charge_combo.currentText()
-        if charge_text == "All":
-            return None
-        elif charge_text == "+2":
-            return 2
-        elif charge_text == "+1":
-            return 1
-        elif charge_text == "0":
-            return 0
-        elif charge_text == "-1":
-            return -1
-        return None
-
-    def _on_visual_property_changed(self):
-        """Handle visual property encoding change"""
-        # Update table visual properties
-        glow_text = self.color_combo.currentText().lower().replace("-", "_")
-        border_text = self.border_combo.currentText().lower().replace("-", "_")
-
-        self.table.glow_property = SubatomicProperty.from_string(glow_text)
-        self.table.border_property = SubatomicProperty.from_string(border_text)
-        self.table.update()
-
-    def _on_reset_view(self):
-        """Reset view to default"""
-        self.table.reset_view()
 
     def _create_data_management_group(self):
         """Create data management controls group"""
@@ -491,7 +869,7 @@ class SubatomicControlPanel(QWidget):
 
         layout.addLayout(btn_layout)
 
-        # Create button (for creating from sub-components)
+        # Create button (for creating from quarks)
         self.create_btn = QPushButton("Create from Quarks")
         self.create_btn.setStyleSheet("""
             QPushButton {
@@ -536,6 +914,92 @@ class SubatomicControlPanel(QWidget):
 
         group.setLayout(layout)
         return group
+
+    def _on_layout_changed(self, mode):
+        """Handle layout mode change"""
+        self.table.set_layout_mode(mode)
+
+    def _on_filter_changed(self):
+        """Handle filter checkbox change"""
+        self.table.set_filter(
+            show_baryons=self.show_baryons_check.isChecked(),
+            show_mesons=self.show_mesons_check.isChecked(),
+            show_stable=self.show_stable_check.isChecked(),
+            show_unstable=self.show_unstable_check.isChecked(),
+            charge=self._get_charge_filter()
+        )
+
+    def _on_charge_filter_changed(self, index):
+        """Handle charge filter combo change"""
+        self._on_filter_changed()
+
+    def _get_charge_filter(self):
+        """Get current charge filter value"""
+        charge_text = self.charge_combo.currentText()
+        if charge_text == "All":
+            return None
+        elif charge_text == "+2":
+            return 2
+        elif charge_text == "+1":
+            return 1
+        elif charge_text == "0":
+            return 0
+        elif charge_text == "-1":
+            return -1
+        elif charge_text == "-2":
+            return -2
+        return None
+
+    def on_property_changed(self, property_key, index):
+        """Handle property selection change from property controls"""
+        # Map property options to internal property names
+        property_map = {
+            0: SubatomicProperty.MASS,
+            1: SubatomicProperty.CHARGE,
+            2: SubatomicProperty.SPIN,
+            3: SubatomicProperty.HALF_LIFE,
+            4: SubatomicProperty.STRANGENESS,
+            5: SubatomicProperty.ISOSPIN,
+            6: SubatomicProperty.BARYON_NUMBER,
+            7: SubatomicProperty.STABILITY,
+            8: SubatomicProperty.NONE,
+        }
+
+        prop = property_map.get(index, SubatomicProperty.NONE)
+
+        if property_key == "fill_color":
+            self.table.fill_property = prop
+        elif property_key == "border_color":
+            self.table.border_property = prop
+        elif property_key == "glow_color":
+            self.table.glow_property = prop
+        elif property_key == "ring_color":
+            if hasattr(self.table, 'ring_property'):
+                self.table.ring_property = prop
+        elif property_key == "symbol_text_color":
+            if hasattr(self.table, 'symbol_text_property'):
+                self.table.symbol_text_property = prop
+
+        self.table.update()
+
+    def _on_reset_view(self):
+        """Reset view to default"""
+        self.table.reset_view()
+
+    def reset_property_mappings(self):
+        """Reset all property controls to their default mappings"""
+        # 1. Fill Colour -> Mass
+        self.fill_color_control.property_combo.setCurrentIndex(0)
+        # 2. Border Colour -> Charge
+        self.border_color_control.property_combo.setCurrentIndex(1)
+        # 3. Glow Colour -> Spin
+        self.glow_color_control.property_combo.setCurrentIndex(2)
+        # 4. Inner Ring Colour -> Baryon Number
+        self.ring_color_control.property_combo.setCurrentIndex(6)
+        # 5. Symbol Text Colour -> Isospin
+        self.symbol_text_color_control.property_combo.setCurrentIndex(5)
+
+        self.table.update()
 
     def set_item_selected(self, selected):
         """Enable/disable edit and remove buttons based on selection state"""
