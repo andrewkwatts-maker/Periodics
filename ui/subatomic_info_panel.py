@@ -3,11 +3,13 @@ Subatomic Info Panel - Particle Information Display
 Shows detailed properties and quark composition for selected particles
 """
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QTextEdit, QFrame, QHBoxLayout
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QTextEdit, QFrame, QHBoxLayout, QStackedWidget
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QColor, QPainter, QBrush, QPen
 
 from core.subatomic_enums import QuarkType, PARTICLE_COLORS
+from data.data_manager import DataCategory
+from ui.inline_editor import InlineDataEditor
 
 
 class QuarkDiagram(QWidget):
@@ -125,23 +127,36 @@ class QuarkDiagram(QWidget):
 class SubatomicInfoPanel(QWidget):
     """Panel displaying detailed particle information"""
 
+    data_saved = Signal(dict)
+    edit_cancelled = Signal()
+
     def __init__(self):
         super().__init__()
         self.particle = None
+        self._editor = None
         self.setup_ui()
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        # Create stacked widget for display/edit modes
+        self.stack = QStackedWidget()
+        layout.addWidget(self.stack)
+
+        # Display widget (existing content)
+        display_widget = QWidget()
+        display_layout = QVBoxLayout(display_widget)
+        display_layout.setContentsMargins(20, 20, 20, 20)
 
         title = QLabel("Particle Analysis")
         title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
         title.setStyleSheet("color: #4fc3f7;")
-        layout.addWidget(title)
+        display_layout.addWidget(title)
 
         # Quark diagram
         self.quark_diagram = QuarkDiagram()
-        layout.addWidget(self.quark_diagram)
+        display_layout.addWidget(self.quark_diagram)
 
         # Info text
         self.info_text = QTextEdit()
@@ -156,7 +171,9 @@ class SubatomicInfoPanel(QWidget):
                 font-size: 13px;
             }
         """)
-        layout.addWidget(self.info_text)
+        display_layout.addWidget(self.info_text)
+
+        self.stack.addWidget(display_widget)
 
         self.show_default()
 
@@ -336,3 +353,37 @@ class SubatomicInfoPanel(QWidget):
         """
 
         self.info_text.setHtml(html)
+
+    def start_add(self, template_data=None):
+        """Start add mode with inline editor"""
+        self._editor = InlineDataEditor(DataCategory.SUBATOMIC, template_data)
+        self._editor.saved.connect(self._on_editor_saved)
+        self._editor.cancelled.connect(self._on_editor_cancelled)
+        self.stack.addWidget(self._editor)
+        self.stack.setCurrentWidget(self._editor)
+
+    def start_edit(self, data):
+        """Start edit mode with inline editor"""
+        self._editor = InlineDataEditor(DataCategory.SUBATOMIC, data, edit_mode=True)
+        self._editor.saved.connect(self._on_editor_saved)
+        self._editor.cancelled.connect(self._on_editor_cancelled)
+        self.stack.addWidget(self._editor)
+        self.stack.setCurrentWidget(self._editor)
+
+    def _on_editor_saved(self, data):
+        """Handle editor save"""
+        self.stack.setCurrentIndex(0)
+        if self._editor:
+            self.stack.removeWidget(self._editor)
+            self._editor.deleteLater()
+            self._editor = None
+        self.data_saved.emit(data)
+
+    def _on_editor_cancelled(self):
+        """Handle editor cancel"""
+        self.stack.setCurrentIndex(0)
+        if self._editor:
+            self.stack.removeWidget(self._editor)
+            self._editor.deleteLater()
+            self._editor = None
+        self.edit_cancelled.emit()

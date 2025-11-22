@@ -4,30 +4,46 @@ Quark Info Panel
 Displays detailed information about selected particles.
 """
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QTextEdit
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QTextEdit, QStackedWidget
 from PySide6.QtGui import QFont
 
 from core.quark_enums import ParticleType
+from data.data_manager import DataCategory
+from ui.inline_editor import InlineDataEditor
 
 
 class QuarkInfoPanel(QWidget):
     """Panel displaying detailed particle information"""
 
+    data_saved = Signal(dict)
+    edit_cancelled = Signal()
+
     def __init__(self):
         super().__init__()
         self.particle = None
+        self._editor = None
         self.setup_ui()
 
     def setup_ui(self):
         """Set up the panel UI"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        # Create stacked widget for switching between display and edit modes
+        self.stack = QStackedWidget()
+        layout.addWidget(self.stack)
+
+        # Display widget (index 0)
+        display_widget = QWidget()
+        display_layout = QVBoxLayout(display_widget)
+        display_layout.setContentsMargins(20, 20, 20, 20)
 
         # Title
         title = QLabel("Particle Analysis")
         title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
         title.setStyleSheet("color: #4fc3f7;")
-        layout.addWidget(title)
+        display_layout.addWidget(title)
 
         # Info display
         self.info_text = QTextEdit()
@@ -42,7 +58,9 @@ class QuarkInfoPanel(QWidget):
                 font-size: 13px;
             }
         """)
-        layout.addWidget(self.info_text)
+        display_layout.addWidget(self.info_text)
+
+        self.stack.addWidget(display_widget)
 
         self.show_default()
 
@@ -226,3 +244,37 @@ class QuarkInfoPanel(QWidget):
         """
 
         self.info_text.setHtml(html)
+
+    def start_add(self, template_data=None):
+        """Start add mode with the inline editor"""
+        self._editor = InlineDataEditor(DataCategory.QUARKS, template_data)
+        self._editor.saved.connect(self._on_editor_saved)
+        self._editor.cancelled.connect(self._on_editor_cancelled)
+        self.stack.addWidget(self._editor)
+        self.stack.setCurrentWidget(self._editor)
+
+    def start_edit(self, data):
+        """Start edit mode with the inline editor"""
+        self._editor = InlineDataEditor(DataCategory.QUARKS, data, edit_mode=True)
+        self._editor.saved.connect(self._on_editor_saved)
+        self._editor.cancelled.connect(self._on_editor_cancelled)
+        self.stack.addWidget(self._editor)
+        self.stack.setCurrentWidget(self._editor)
+
+    def _on_editor_saved(self, data):
+        """Handle editor save - switch back to display and emit signal"""
+        self.stack.setCurrentIndex(0)
+        if self._editor:
+            self.stack.removeWidget(self._editor)
+            self._editor.deleteLater()
+            self._editor = None
+        self.data_saved.emit(data)
+
+    def _on_editor_cancelled(self):
+        """Handle editor cancel - switch back to display and emit signal"""
+        self.stack.setCurrentIndex(0)
+        if self._editor:
+            self.stack.removeWidget(self._editor)
+            self._editor.deleteLater()
+            self._editor = None
+        self.edit_cancelled.emit()

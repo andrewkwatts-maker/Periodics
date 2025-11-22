@@ -718,6 +718,7 @@ class QuarkControlPanel(QWidget):
     edit_requested = Signal()
     remove_requested = Signal()
     reset_requested = Signal()
+    create_requested = Signal()
 
     def __init__(self, table_widget):
         super().__init__()

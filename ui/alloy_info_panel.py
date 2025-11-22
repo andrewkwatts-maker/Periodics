@@ -8,11 +8,13 @@ Displays detailed information about selected alloys including:
 """
 
 import math
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QFrame, QTabWidget
-from PySide6.QtCore import Qt, QPointF, QRectF
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QFrame, QTabWidget, QStackedWidget
+from PySide6.QtCore import Qt, QPointF, QRectF, Signal
 from PySide6.QtGui import QFont, QPainter, QColor, QBrush, QPen, QRadialGradient, QPainterPath, QLinearGradient
 
 from core.alloy_enums import (AlloyCategory, CrystalStructure, ComponentRole, get_element_color)
+from data.data_manager import DataCategory
+from ui.inline_editor import InlineDataEditor
 
 # Import crystalline math for microstructure visualization
 try:
@@ -358,20 +360,34 @@ class CompositionPieWidget(QFrame):
 class AlloyInfoPanel(QWidget):
     """Panel displaying detailed alloy information"""
 
+    data_saved = Signal(dict)
+    edit_cancelled = Signal()
+
     def __init__(self):
         super().__init__()
         self.alloy = None
+        self._editor = None
         self.setup_ui()
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(10)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        # Create stacked widget to switch between display and edit modes
+        self.stack = QStackedWidget()
+        layout.addWidget(self.stack)
+
+        # Display widget (index 0)
+        display_widget = QWidget()
+        display_layout = QVBoxLayout(display_widget)
+        display_layout.setContentsMargins(15, 15, 15, 15)
+        display_layout.setSpacing(10)
 
         title = QLabel("Alloy Analysis")
         title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
         title.setStyleSheet("color: #B08264;")
-        layout.addWidget(title)
+        display_layout.addWidget(title)
 
         # Create tab widget for different views
         self.tabs = QTabWidget()
@@ -434,7 +450,9 @@ class AlloyInfoPanel(QWidget):
         """)
         self.tabs.addTab(self.info_text, "Details")
 
-        layout.addWidget(self.tabs)
+        display_layout.addWidget(self.tabs)
+
+        self.stack.addWidget(display_widget)
 
         self.show_default()
 
@@ -602,3 +620,37 @@ class AlloyInfoPanel(QWidget):
             </div>
         """
         self.info_text.setHtml(html)
+
+    def start_add(self, template_data=None):
+        """Start add mode with inline editor"""
+        self._editor = InlineDataEditor(DataCategory.ALLOYS, template_data)
+        self._editor.saved.connect(self._on_editor_saved)
+        self._editor.cancelled.connect(self._on_editor_cancelled)
+        self.stack.addWidget(self._editor)
+        self.stack.setCurrentWidget(self._editor)
+
+    def start_edit(self, data):
+        """Start edit mode with inline editor"""
+        self._editor = InlineDataEditor(DataCategory.ALLOYS, data, edit_mode=True)
+        self._editor.saved.connect(self._on_editor_saved)
+        self._editor.cancelled.connect(self._on_editor_cancelled)
+        self.stack.addWidget(self._editor)
+        self.stack.setCurrentWidget(self._editor)
+
+    def _on_editor_saved(self, data):
+        """Handle editor save"""
+        self.stack.setCurrentIndex(0)
+        if self._editor:
+            self.stack.removeWidget(self._editor)
+            self._editor.deleteLater()
+            self._editor = None
+        self.data_saved.emit(data)
+
+    def _on_editor_cancelled(self):
+        """Handle editor cancel"""
+        self.stack.setCurrentIndex(0)
+        if self._editor:
+            self.stack.removeWidget(self._editor)
+            self._editor.deleteLater()
+            self._editor = None
+        self.edit_cancelled.emit()

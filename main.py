@@ -21,7 +21,7 @@ from PySide6.QtGui import QFont, QPalette, QColor
 try:
     from core.unified_table import UnifiedPeriodicTable
     from ui.control_panel import ControlPanel
-    from ui.components import ElementInfoPanel
+    from ui.element_info_panel import ElementInfoPanel
     HAS_ATOMS_TAB = True
 except ImportError as e:
     print(f"Atoms tab not available: {e}")
@@ -160,9 +160,18 @@ class PeriodicsMainWindow(QMainWindow):
         splitter.addWidget(self.atom_info)
 
         # Connect signals
-        self.atom_table.element_selected.connect(self.atom_info.update_element)
+        self.atom_table.element_selected.connect(self._on_atom_selected)
         self.atom_table.element_hovered.connect(lambda e: self.statusBar().showMessage(
             f"Element: {e.get('name', '')} ({e.get('symbol', '')})" if e else ""))
+
+        # Connect data management signals
+        self.atom_control.add_requested.connect(self._on_atom_add)
+        self.atom_control.edit_requested.connect(self._on_atom_edit)
+        self.atom_control.remove_requested.connect(self._on_atom_remove)
+        self.atom_control.reset_requested.connect(self._on_atom_reset)
+        self.atom_control.create_requested.connect(self._on_atom_create)
+        self.atom_info.data_saved.connect(self._on_atom_data_saved)
+        self.atom_info.edit_cancelled.connect(lambda: self.atom_info.show_default())
 
         atoms_layout.addWidget(splitter)
         self.tabs.addTab(atoms_widget, "Atoms")
@@ -186,7 +195,16 @@ class PeriodicsMainWindow(QMainWindow):
         self.quark_info.setFixedWidth(350)
         splitter.addWidget(self.quark_info)
 
-        self.quark_table.quark_selected.connect(self.quark_info.update_quark)
+        self.quark_table.quark_selected.connect(self._on_quark_selected)
+
+        # Connect data management signals
+        self.quark_control.add_requested.connect(self._on_quark_add)
+        self.quark_control.edit_requested.connect(self._on_quark_edit)
+        self.quark_control.remove_requested.connect(self._on_quark_remove)
+        self.quark_control.reset_requested.connect(self._on_quark_reset)
+        self.quark_control.create_requested.connect(self._on_quark_create)
+        self.quark_info.data_saved.connect(self._on_quark_data_saved)
+        self.quark_info.edit_cancelled.connect(lambda: self.quark_info.show_default())
 
         quarks_layout.addWidget(splitter)
         self.tabs.addTab(quarks_widget, "Quarks")
@@ -210,7 +228,16 @@ class PeriodicsMainWindow(QMainWindow):
         self.subatomic_info.setFixedWidth(350)
         splitter.addWidget(self.subatomic_info)
 
-        self.subatomic_table.particle_selected.connect(self.subatomic_info.update_particle)
+        self.subatomic_table.particle_selected.connect(self._on_subatomic_selected)
+
+        # Connect data management signals
+        self.subatomic_control.add_requested.connect(self._on_subatomic_add)
+        self.subatomic_control.edit_requested.connect(self._on_subatomic_edit)
+        self.subatomic_control.remove_requested.connect(self._on_subatomic_remove)
+        self.subatomic_control.reset_requested.connect(self._on_subatomic_reset)
+        self.subatomic_control.create_requested.connect(self._on_subatomic_create)
+        self.subatomic_info.data_saved.connect(self._on_subatomic_data_saved)
+        self.subatomic_info.edit_cancelled.connect(lambda: self.subatomic_info.show_default())
 
         subatomic_layout.addWidget(splitter)
         self.tabs.addTab(subatomic_widget, "Subatomic")
@@ -234,7 +261,16 @@ class PeriodicsMainWindow(QMainWindow):
         self.molecule_info.setFixedWidth(350)
         splitter.addWidget(self.molecule_info)
 
-        self.molecule_table.molecule_selected.connect(self.molecule_info.update_molecule)
+        self.molecule_table.molecule_selected.connect(self._on_molecule_selected)
+
+        # Connect data management signals
+        self.molecule_control.add_requested.connect(self._on_molecule_add)
+        self.molecule_control.edit_requested.connect(self._on_molecule_edit)
+        self.molecule_control.remove_requested.connect(self._on_molecule_remove)
+        self.molecule_control.reset_requested.connect(self._on_molecule_reset)
+        self.molecule_control.create_requested.connect(self._on_molecule_create)
+        self.molecule_info.data_saved.connect(self._on_molecule_data_saved)
+        self.molecule_info.edit_cancelled.connect(lambda: self.molecule_info.show_default())
 
         molecules_layout.addWidget(splitter)
         self.tabs.addTab(molecules_widget, "Molecules")
@@ -349,6 +385,266 @@ class PeriodicsMainWindow(QMainWindow):
         """Called when a new alloy is created"""
         self.alloy_table.reload_data()
         self.alloy_control.update_item_count(len(self.alloy_table.base_alloys))
+
+    # ==================== ATOMS TAB HANDLERS ====================
+
+    def _on_atom_selected(self, element):
+        """Handle atom selection"""
+        self.atom_info.update_element(element)
+        self.atom_control.set_item_selected(element is not None)
+
+    def _on_atom_add(self):
+        """Handle atom add request - show inline editor"""
+        # Get selected element as template if available
+        template = None
+        if hasattr(self.atom_table, 'selected_element'):
+            template = self.atom_table.selected_element
+        self.atom_info.start_add(template)
+
+    def _on_atom_edit(self):
+        """Handle atom edit request - show inline editor"""
+        if hasattr(self.atom_table, 'selected_element') and self.atom_table.selected_element:
+            self.atom_info.start_edit(self.atom_table.selected_element)
+
+    def _on_atom_remove(self):
+        """Handle atom remove request"""
+        if hasattr(self.atom_table, 'selected_element') and self.atom_table.selected_element:
+            elem = self.atom_table.selected_element
+            name = elem.get('name', 'Unknown')
+            reply = QMessageBox.question(
+                self, "Remove Element",
+                f"Are you sure you want to remove '{name}'?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            if reply == QMessageBox.Yes:
+                manager = get_data_manager()
+                z = elem.get('atomic_number', 0)
+                symbol = elem.get('symbol', 'X')
+                filename = f"{z:03d}_{symbol}"
+                if manager.remove_item(DataCategory.ELEMENTS, filename):
+                    self.atom_table.reload_data()
+                    self.atom_info.show_default()
+                    self.atom_control.set_item_selected(False)
+
+    def _on_atom_reset(self):
+        """Handle atom reset request"""
+        reply = QMessageBox.question(
+            self, "Reset Elements",
+            "Are you sure you want to reset all elements to defaults?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            manager = get_data_manager()
+            if manager.reset_category(DataCategory.ELEMENTS):
+                self.atom_table.reload_data()
+                self.atom_info.show_default()
+                QMessageBox.information(self, "Success", "Elements reset to defaults.")
+
+    def _on_atom_create(self):
+        """Handle atom creation from subatomic particles"""
+        from ui.creation_dialog import AtomCreationDialog
+        dialog = AtomCreationDialog(self)
+        dialog.atom_created.connect(lambda: self._on_atom_data_saved(None))
+        dialog.exec()
+
+    def _on_atom_data_saved(self, data):
+        """Called when atom data is saved"""
+        self.atom_table.reload_data()
+        self.atom_info.show_default()
+
+    # ==================== QUARKS TAB HANDLERS ====================
+
+    def _on_quark_selected(self, quark):
+        """Handle quark selection"""
+        self.quark_info.update_quark(quark)
+        self.quark_control.set_item_selected(quark is not None)
+
+    def _on_quark_add(self):
+        """Handle quark add request - show inline editor"""
+        template = None
+        if hasattr(self.quark_table, 'selected_quark'):
+            template = self.quark_table.selected_quark
+        self.quark_info.start_add(template)
+
+    def _on_quark_edit(self):
+        """Handle quark edit request - show inline editor"""
+        if hasattr(self.quark_table, 'selected_quark') and self.quark_table.selected_quark:
+            self.quark_info.start_edit(self.quark_table.selected_quark)
+
+    def _on_quark_remove(self):
+        """Handle quark remove request"""
+        if hasattr(self.quark_table, 'selected_quark') and self.quark_table.selected_quark:
+            quark = self.quark_table.selected_quark
+            name = quark.get('Name', 'Unknown')
+            reply = QMessageBox.question(
+                self, "Remove Quark",
+                f"Are you sure you want to remove '{name}'?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            if reply == QMessageBox.Yes:
+                manager = get_data_manager()
+                filename = name.replace(' ', '_')
+                if manager.remove_item(DataCategory.QUARKS, filename):
+                    self.quark_table.reload_data()
+                    self.quark_info.show_default()
+                    self.quark_control.set_item_selected(False)
+
+    def _on_quark_reset(self):
+        """Handle quark reset request"""
+        reply = QMessageBox.question(
+            self, "Reset Quarks",
+            "Are you sure you want to reset all quarks to defaults?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            manager = get_data_manager()
+            if manager.reset_category(DataCategory.QUARKS):
+                self.quark_table.reload_data()
+                self.quark_info.show_default()
+                QMessageBox.information(self, "Success", "Quarks reset to defaults.")
+
+    def _on_quark_create(self):
+        """Handle quark creation (quarks are fundamental, so just add)"""
+        self.quark_info.start_add(None)
+
+    def _on_quark_data_saved(self, data):
+        """Called when quark data is saved"""
+        self.quark_table.reload_data()
+        self.quark_info.show_default()
+
+    # ==================== SUBATOMIC TAB HANDLERS ====================
+
+    def _on_subatomic_selected(self, particle):
+        """Handle subatomic particle selection"""
+        self.subatomic_info.update_particle(particle)
+        self.subatomic_control.set_item_selected(particle is not None)
+
+    def _on_subatomic_add(self):
+        """Handle subatomic add request - show inline editor"""
+        template = None
+        if hasattr(self.subatomic_table, 'selected_particle'):
+            template = self.subatomic_table.selected_particle
+        self.subatomic_info.start_add(template)
+
+    def _on_subatomic_edit(self):
+        """Handle subatomic edit request - show inline editor"""
+        if hasattr(self.subatomic_table, 'selected_particle') and self.subatomic_table.selected_particle:
+            self.subatomic_info.start_edit(self.subatomic_table.selected_particle)
+
+    def _on_subatomic_remove(self):
+        """Handle subatomic remove request"""
+        if hasattr(self.subatomic_table, 'selected_particle') and self.subatomic_table.selected_particle:
+            particle = self.subatomic_table.selected_particle
+            name = particle.get('Name', 'Unknown')
+            reply = QMessageBox.question(
+                self, "Remove Particle",
+                f"Are you sure you want to remove '{name}'?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            if reply == QMessageBox.Yes:
+                manager = get_data_manager()
+                filename = name.replace(' ', '_')
+                if manager.remove_item(DataCategory.SUBATOMIC, filename):
+                    self.subatomic_table.reload_data()
+                    self.subatomic_info.show_default()
+                    self.subatomic_control.set_item_selected(False)
+
+    def _on_subatomic_reset(self):
+        """Handle subatomic reset request"""
+        reply = QMessageBox.question(
+            self, "Reset Subatomic Particles",
+            "Are you sure you want to reset all subatomic particles to defaults?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            manager = get_data_manager()
+            if manager.reset_category(DataCategory.SUBATOMIC):
+                self.subatomic_table.reload_data()
+                self.subatomic_info.show_default()
+                QMessageBox.information(self, "Success", "Subatomic particles reset to defaults.")
+
+    def _on_subatomic_create(self):
+        """Handle subatomic creation from quarks"""
+        from ui.creation_dialog import SubatomicCreationDialog
+        dialog = SubatomicCreationDialog(self)
+        dialog.particle_created.connect(lambda: self._on_subatomic_data_saved(None))
+        dialog.exec()
+
+    def _on_subatomic_data_saved(self, data):
+        """Called when subatomic data is saved"""
+        self.subatomic_table.reload_data()
+        self.subatomic_info.show_default()
+
+    # ==================== MOLECULES TAB HANDLERS ====================
+
+    def _on_molecule_selected(self, molecule):
+        """Handle molecule selection"""
+        self.molecule_info.update_molecule(molecule)
+        self.molecule_control.set_item_selected(molecule is not None)
+
+    def _on_molecule_add(self):
+        """Handle molecule add request - show inline editor"""
+        template = None
+        if hasattr(self.molecule_table, 'selected_molecule'):
+            template = self.molecule_table.selected_molecule
+        self.molecule_info.start_add(template)
+
+    def _on_molecule_edit(self):
+        """Handle molecule edit request - show inline editor"""
+        if hasattr(self.molecule_table, 'selected_molecule') and self.molecule_table.selected_molecule:
+            self.molecule_info.start_edit(self.molecule_table.selected_molecule)
+
+    def _on_molecule_remove(self):
+        """Handle molecule remove request"""
+        if hasattr(self.molecule_table, 'selected_molecule') and self.molecule_table.selected_molecule:
+            mol = self.molecule_table.selected_molecule
+            name = mol.get('Name', 'Unknown')
+            reply = QMessageBox.question(
+                self, "Remove Molecule",
+                f"Are you sure you want to remove '{name}'?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            if reply == QMessageBox.Yes:
+                manager = get_data_manager()
+                filename = name.replace(' ', '_')
+                if manager.remove_item(DataCategory.MOLECULES, filename):
+                    self.molecule_table.reload_data()
+                    self.molecule_info.show_default()
+                    self.molecule_control.set_item_selected(False)
+
+    def _on_molecule_reset(self):
+        """Handle molecule reset request"""
+        reply = QMessageBox.question(
+            self, "Reset Molecules",
+            "Are you sure you want to reset all molecules to defaults?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            manager = get_data_manager()
+            if manager.reset_category(DataCategory.MOLECULES):
+                self.molecule_table.reload_data()
+                self.molecule_info.show_default()
+                QMessageBox.information(self, "Success", "Molecules reset to defaults.")
+
+    def _on_molecule_create(self):
+        """Handle molecule creation from atoms"""
+        from ui.creation_dialog import MoleculeCreationDialog
+        dialog = MoleculeCreationDialog(self)
+        dialog.molecule_created.connect(lambda: self._on_molecule_data_saved(None))
+        dialog.exec()
+
+    def _on_molecule_data_saved(self, data):
+        """Called when molecule data is saved"""
+        self.molecule_table.reload_data()
+        self.molecule_info.show_default()
 
     def setup_statusbar(self):
         """Setup the status bar"""

@@ -340,6 +340,9 @@ class MoleculePropertyControl(QWidget):
 
     def _update_displays(self):
         """Update slider display values"""
+        # Guard against being called before sliders are created
+        if not hasattr(self, 'min_slider') or not hasattr(self, 'max_slider'):
+            return
         min_t = self.min_slider.value() / 1000.0
         max_t = self.max_slider.value() / 1000.0
 

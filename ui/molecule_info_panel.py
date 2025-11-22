@@ -1,15 +1,18 @@
 """
 Molecule Info Panel
 Displays detailed information about selected molecules.
+Supports inline editing mode for Add/Edit operations.
 """
 
 import math
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QTextEdit, QFrame
-from PySide6.QtCore import Qt, QPointF
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QTextEdit, QFrame,
+                                QStackedWidget)
+from PySide6.QtCore import Qt, QPointF, Signal
 from PySide6.QtGui import QFont, QPainter, QColor, QBrush, QPen, QRadialGradient, QPainterPath
 
 from core.molecule_enums import (MolecularGeometry, BondType, MoleculePolarity,
                                   MoleculeCategory, MoleculeState, get_element_color)
+from data.data_manager import DataCategory
 
 
 class MoleculeStructureWidget(QFrame):
@@ -271,25 +274,39 @@ class MoleculeStructureWidget(QFrame):
 
 
 class MoleculeInfoPanel(QWidget):
-    """Panel displaying detailed molecule information"""
+    """Panel displaying detailed molecule information with inline editing support"""
+
+    # Signals for data management
+    data_saved = Signal(dict)
+    edit_cancelled = Signal()
 
     def __init__(self):
         super().__init__()
         self.molecule = None
+        self._editor = None
         self.setup_ui()
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        # Stacked widget for switching between display and edit modes
+        self.stack = QStackedWidget()
+        layout.addWidget(self.stack)
+
+        # Display mode widget
+        self.display_widget = QWidget()
+        display_layout = QVBoxLayout(self.display_widget)
+        display_layout.setContentsMargins(20, 20, 20, 20)
 
         title = QLabel("Molecule Analysis")
         title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
         title.setStyleSheet("color: #4fc3f7;")
-        layout.addWidget(title)
+        display_layout.addWidget(title)
 
         # Structure widget
         self.structure_widget = MoleculeStructureWidget()
-        layout.addWidget(self.structure_widget)
+        display_layout.addWidget(self.structure_widget)
 
         # Info text
         self.info_text = QTextEdit()
@@ -304,9 +321,46 @@ class MoleculeInfoPanel(QWidget):
                 font-size: 13px;
             }
         """)
-        layout.addWidget(self.info_text)
+        display_layout.addWidget(self.info_text)
 
+        self.stack.addWidget(self.display_widget)
         self.show_default()
+
+    def start_add(self, template_data=None):
+        """Start add mode with inline editor"""
+        from ui.inline_editor import InlineDataEditor
+
+        if self._editor is None:
+            self._editor = InlineDataEditor()
+            self._editor.data_saved.connect(self._on_editor_saved)
+            self._editor.edit_cancelled.connect(self._on_editor_cancelled)
+            self.stack.addWidget(self._editor)
+
+        self._editor.start_add(DataCategory.MOLECULES, template_data)
+        self.stack.setCurrentWidget(self._editor)
+
+    def start_edit(self, data):
+        """Start edit mode with inline editor"""
+        from ui.inline_editor import InlineDataEditor
+
+        if self._editor is None:
+            self._editor = InlineDataEditor()
+            self._editor.data_saved.connect(self._on_editor_saved)
+            self._editor.edit_cancelled.connect(self._on_editor_cancelled)
+            self.stack.addWidget(self._editor)
+
+        self._editor.start_edit(DataCategory.MOLECULES, data)
+        self.stack.setCurrentWidget(self._editor)
+
+    def _on_editor_saved(self, data):
+        """Handle save from editor"""
+        self.stack.setCurrentWidget(self.display_widget)
+        self.data_saved.emit(data)
+
+    def _on_editor_cancelled(self):
+        """Handle cancel from editor"""
+        self.stack.setCurrentWidget(self.display_widget)
+        self.edit_cancelled.emit()
 
     def show_default(self):
         """Show default message"""
