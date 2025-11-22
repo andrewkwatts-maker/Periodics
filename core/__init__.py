@@ -12,5 +12,45 @@ Core application classes
 """
 
 from core.unified_table import UnifiedTable
+from core.molecule_unified_table import MoleculeUnifiedTable
+from core.molecule_enums import (MoleculeLayoutMode, MoleculeProperty, BondType,
+                                  MolecularGeometry, MoleculePolarity, MoleculeCategory,
+                                  MoleculeState, get_element_color)
 
-__all__ = ['UnifiedTable']
+# Quark/Particle visualization
+from core.quark_unified_table import QuarkUnifiedTable
+from core.quark_enums import (QuarkLayoutMode, QuarkProperty, ParticleType,
+                               QuarkGeneration, InteractionForce)
+
+# Subatomic particle visualization
+from core.subatomic_unified_table import SubatomicUnifiedTable
+from core.subatomic_enums import (SubatomicLayoutMode, SubatomicProperty, ParticleCategory,
+                                   QuarkType, PARTICLE_COLORS, get_particle_family_color)
+
+__all__ = [
+    'UnifiedTable',
+    'MoleculeUnifiedTable',
+    'MoleculeLayoutMode',
+    'MoleculeProperty',
+    'BondType',
+    'MolecularGeometry',
+    'MoleculePolarity',
+    'MoleculeCategory',
+    'MoleculeState',
+    'get_element_color',
+    # Quark exports
+    'QuarkUnifiedTable',
+    'QuarkLayoutMode',
+    'QuarkProperty',
+    'ParticleType',
+    'QuarkGeneration',
+    'InteractionForce',
+    # Subatomic exports
+    'SubatomicUnifiedTable',
+    'SubatomicLayoutMode',
+    'SubatomicProperty',
+    'ParticleCategory',
+    'QuarkType',
+    'PARTICLE_COLORS',
+    'get_particle_family_color'
+]

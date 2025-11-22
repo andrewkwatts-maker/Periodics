@@ -1,0 +1,33 @@
+{
+    "Name": "Benzene",
+    "Formula": "C6H6",
+    "MolecularMass_amu": 78.11,
+    "MolecularMass_g_mol": 78.11,
+    "BondType": "Covalent",
+    "Geometry": "Planar Hexagonal",
+    "BondAngle_deg": 120.0,
+    "Polarity": "Nonpolar",
+    "MeltingPoint_K": 278.7,
+    "BoilingPoint_K": 353.3,
+    "Density_g_cm3": 0.8765,
+    "State_STP": "Liquid",
+    "Composition": [
+        {"Element": "C", "Count": 6},
+        {"Element": "H", "Count": 6}
+    ],
+    "Bonds": [
+        {"From": "C", "To": "C", "Type": "Aromatic", "Length_pm": 140, "Index": 1},
+        {"From": "C", "To": "C", "Type": "Aromatic", "Length_pm": 140, "Index": 2},
+        {"From": "C", "To": "C", "Type": "Aromatic", "Length_pm": 140, "Index": 3},
+        {"From": "C", "To": "C", "Type": "Aromatic", "Length_pm": 140, "Index": 4},
+        {"From": "C", "To": "C", "Type": "Aromatic", "Length_pm": 140, "Index": 5},
+        {"From": "C", "To": "C", "Type": "Aromatic", "Length_pm": 140, "Index": 6},
+        {"From": "C", "To": "H", "Type": "Single", "Length_pm": 109, "Index": 7}
+    ],
+    "DipoleMoment_D": 0.0,
+    "ElectronConfiguration": "C: 1s2 2s2 2p2, H: 1s1",
+    "Applications": ["Chemical synthesis", "Solvent", "Petrochemical feedstock", "Plastic production"],
+    "IUPAC_Name": "Benzene",
+    "Category": "Organic",
+    "Color": "#9C27B0"
+}

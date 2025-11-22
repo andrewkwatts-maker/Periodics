@@ -1,0 +1,33 @@
+{
+    "Name": "Sulfuric Acid",
+    "Formula": "H2SO4",
+    "MolecularMass_amu": 98.079,
+    "MolecularMass_g_mol": 98.079,
+    "BondType": "Covalent",
+    "Geometry": "Tetrahedral",
+    "BondAngle_deg": 109.5,
+    "Polarity": "Polar",
+    "MeltingPoint_K": 283.5,
+    "BoilingPoint_K": 610.0,
+    "Density_g_cm3": 1.84,
+    "State_STP": "Liquid",
+    "Composition": [
+        {"Element": "H", "Count": 2},
+        {"Element": "S", "Count": 1},
+        {"Element": "O", "Count": 4}
+    ],
+    "Bonds": [
+        {"From": "S", "To": "O", "Type": "Double", "Length_pm": 142, "Index": 1},
+        {"From": "S", "To": "O", "Type": "Double", "Length_pm": 142, "Index": 2},
+        {"From": "S", "To": "O", "Type": "Single", "Length_pm": 157, "Index": 3},
+        {"From": "S", "To": "O", "Type": "Single", "Length_pm": 157, "Index": 4},
+        {"From": "O", "To": "H", "Type": "Single", "Length_pm": 97, "Index": 5},
+        {"From": "O", "To": "H", "Type": "Single", "Length_pm": 97, "Index": 6}
+    ],
+    "DipoleMoment_D": 2.72,
+    "ElectronConfiguration": "H: 1s1, S: 1s2 2s2 2p6 3s2 3p4, O: 1s2 2s2 2p4",
+    "Applications": ["Battery acid", "Fertilizer production", "Chemical synthesis", "Industrial processes"],
+    "IUPAC_Name": "Sulfuric acid",
+    "Category": "Inorganic",
+    "Color": "#FFEB3B"
+}

@@ -1,0 +1,27 @@
+{
+    "Name": "Hydrogen Chloride",
+    "Formula": "HCl",
+    "MolecularMass_amu": 36.461,
+    "MolecularMass_g_mol": 36.461,
+    "BondType": "Covalent",
+    "Geometry": "Linear",
+    "BondAngle_deg": 180.0,
+    "Polarity": "Polar",
+    "MeltingPoint_K": 158.97,
+    "BoilingPoint_K": 188.1,
+    "Density_g_cm3": 0.00149,
+    "State_STP": "Gas",
+    "Composition": [
+        {"Element": "H", "Count": 1},
+        {"Element": "Cl", "Count": 1}
+    ],
+    "Bonds": [
+        {"From": "H", "To": "Cl", "Type": "Single", "Length_pm": 127, "Index": 1}
+    ],
+    "DipoleMoment_D": 1.08,
+    "ElectronConfiguration": "H: 1s1, Cl: 1s2 2s2 2p6 3s2 3p5",
+    "Applications": ["Hydrochloric acid production", "Chemical synthesis", "pH control", "Metal cleaning"],
+    "IUPAC_Name": "Hydrogen chloride",
+    "Category": "Inorganic",
+    "Color": "#00BCD4"
+}

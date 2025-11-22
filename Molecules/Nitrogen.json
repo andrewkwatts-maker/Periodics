@@ -1,0 +1,26 @@
+{
+    "Name": "Nitrogen",
+    "Formula": "N2",
+    "MolecularMass_amu": 28.014,
+    "MolecularMass_g_mol": 28.014,
+    "BondType": "Covalent",
+    "Geometry": "Linear",
+    "BondAngle_deg": 180.0,
+    "Polarity": "Nonpolar",
+    "MeltingPoint_K": 63.15,
+    "BoilingPoint_K": 77.36,
+    "Density_g_cm3": 0.001251,
+    "State_STP": "Gas",
+    "Composition": [
+        {"Element": "N", "Count": 2}
+    ],
+    "Bonds": [
+        {"From": "N", "To": "N", "Type": "Triple", "Length_pm": 110, "Index": 1}
+    ],
+    "DipoleMoment_D": 0.0,
+    "ElectronConfiguration": "N: 1s2 2s2 2p3",
+    "Applications": ["Inert atmosphere", "Cryogenics", "Fertilizer production", "Food preservation"],
+    "IUPAC_Name": "Dinitrogen",
+    "Category": "Inorganic",
+    "Color": "#3F51B5"
+}

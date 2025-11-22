@@ -1,0 +1,31 @@
+{
+    "Name": "Nitric Acid",
+    "Formula": "HNO3",
+    "MolecularMass_amu": 63.01,
+    "MolecularMass_g_mol": 63.01,
+    "BondType": "Covalent",
+    "Geometry": "Trigonal Planar",
+    "BondAngle_deg": 120.0,
+    "Polarity": "Polar",
+    "MeltingPoint_K": 231.0,
+    "BoilingPoint_K": 356.0,
+    "Density_g_cm3": 1.51,
+    "State_STP": "Liquid",
+    "Composition": [
+        {"Element": "H", "Count": 1},
+        {"Element": "N", "Count": 1},
+        {"Element": "O", "Count": 3}
+    ],
+    "Bonds": [
+        {"From": "N", "To": "O", "Type": "Double", "Length_pm": 121, "Index": 1},
+        {"From": "N", "To": "O", "Type": "Single", "Length_pm": 141, "Index": 2},
+        {"From": "N", "To": "O", "Type": "Single", "Length_pm": 141, "Index": 3},
+        {"From": "O", "To": "H", "Type": "Single", "Length_pm": 96, "Index": 4}
+    ],
+    "DipoleMoment_D": 2.17,
+    "ElectronConfiguration": "H: 1s1, N: 1s2 2s2 2p3, O: 1s2 2s2 2p4",
+    "Applications": ["Fertilizer production", "Explosives", "Metal etching", "Rocket propellant"],
+    "IUPAC_Name": "Nitric acid",
+    "Category": "Inorganic",
+    "Color": "#FF5722"
+}
