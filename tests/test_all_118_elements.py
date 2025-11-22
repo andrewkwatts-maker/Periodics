@@ -281,9 +281,15 @@ def get_element_category(atomic_number: int) -> str:
 
 def calculate_percent_error(calculated: float, reference: float) -> Optional[float]:
     """Calculate percentage error between calculated and reference values."""
-    if reference is None or reference == 0:
+    if calculated is None or reference is None:
         return None
-    if calculated is None:
+
+    # Special case: both are zero (exact match)
+    if reference == 0 and calculated == 0:
+        return 0.0
+
+    # Cannot calculate relative error if reference is 0
+    if reference == 0:
         return None
 
     return abs(calculated - reference) / abs(reference)

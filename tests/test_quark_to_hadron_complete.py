@@ -445,8 +445,15 @@ def test_hadron_from_quarks(hadron_data: Dict, quark_data: Dict[str, Dict]) -> O
     # Determine particle type
     particle_type = determine_particle_type(len(quarks))
 
+    # Check if this is a Delta baryon (spin 3/2 excited state)
+    # Delta baryons have same quark content as nucleons but different spin
+    expected_spin = hadron_data.get('Spin_hbar', 0)
+    spin_hint = None
+    if 'Delta' in name:
+        spin_hint = 1.5  # Delta baryons are spin 3/2
+
     # Build hadron using propagate_quark_to_hadron
-    calculated_hadron = propagate_quark_to_hadron(quarks)
+    calculated_hadron = propagate_quark_to_hadron(quarks, spin_hint=spin_hint)
 
     # Create result object
     result = HadronTestResult(
