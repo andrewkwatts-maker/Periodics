@@ -7,8 +7,9 @@
   "period": 3,
   "group": 14,
   "ionization_energy": 8.152,
-  "electronegativity": 1.90,
+  "electronegativity": 1.9,
   "atomic_radius": 111,
+  "covalent_radius": 111,
   "melting_point": 1687,
   "boiling_point": 3538,
   "density": 2.33,
@@ -35,7 +36,7 @@
     {
       "mass_number": 30,
       "neutrons": 16,
-      "abundance": 3.10,
+      "abundance": 3.1,
       "is_stable": true,
       "half_life": null
     }

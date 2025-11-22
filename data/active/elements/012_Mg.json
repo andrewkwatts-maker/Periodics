@@ -9,6 +9,7 @@
   "ionization_energy": 7.646,
   "electronegativity": 1.31,
   "atomic_radius": 145,
+  "covalent_radius": 141,
   "melting_point": 923,
   "boiling_point": 1363,
   "density": 1.74,
@@ -28,7 +29,7 @@
     {
       "mass_number": 25,
       "neutrons": 13,
-      "abundance": 10.00,
+      "abundance": 10.0,
       "is_stable": true,
       "half_life": null
     },

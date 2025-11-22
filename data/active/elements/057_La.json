@@ -7,8 +7,9 @@
   "period": 6,
   "group": 3,
   "ionization_energy": 5.577,
-  "electronegativity": 1.10,
+  "electronegativity": 1.1,
   "atomic_radius": 195,
+  "covalent_radius": 207,
   "melting_point": 1193,
   "boiling_point": 3737,
   "density": 6.16,
@@ -18,7 +19,19 @@
   "primary_emission_wavelength": 550.1,
   "visible_emission_wavelength": 550.1,
   "isotopes": [
-    {"mass_number": 138, "neutrons": 81, "abundance": 0.089, "is_stable": false, "half_life": "1.02e11 years"},
-    {"mass_number": 139, "neutrons": 82, "abundance": 99.911, "is_stable": true, "half_life": null}
+    {
+      "mass_number": 138,
+      "neutrons": 81,
+      "abundance": 0.089,
+      "is_stable": false,
+      "half_life": "1.02e11 years"
+    },
+    {
+      "mass_number": 139,
+      "neutrons": 82,
+      "abundance": 99.911,
+      "is_stable": true,
+      "half_life": null
+    }
   ]
 }

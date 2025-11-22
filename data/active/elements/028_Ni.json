@@ -6,9 +6,10 @@
   "block": "d",
   "period": 4,
   "group": 10,
-  "ionization_energy": 7.640,
+  "ionization_energy": 7.64,
   "electronegativity": 1.91,
   "atomic_radius": 149,
+  "covalent_radius": 124,
   "melting_point": 1728,
   "boiling_point": 3186,
   "density": 8.91,
@@ -35,7 +36,7 @@
     {
       "mass_number": 61,
       "neutrons": 33,
-      "abundance": 1.140,
+      "abundance": 1.14,
       "is_stable": true,
       "half_life": null
     },

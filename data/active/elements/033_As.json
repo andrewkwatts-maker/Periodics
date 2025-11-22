@@ -9,6 +9,7 @@
   "ionization_energy": 9.789,
   "electronegativity": 2.18,
   "atomic_radius": 114,
+  "covalent_radius": 119,
   "melting_point": 1090,
   "boiling_point": 887,
   "density": 5.73,
@@ -18,6 +19,12 @@
   "primary_emission_wavelength": 234.0,
   "visible_emission_wavelength": 450.0,
   "isotopes": [
-    {"mass_number": 75, "neutrons": 42, "abundance": 100.0, "is_stable": true, "half_life": null}
+    {
+      "mass_number": 75,
+      "neutrons": 42,
+      "abundance": 100.0,
+      "is_stable": true,
+      "half_life": null
+    }
   ]
 }

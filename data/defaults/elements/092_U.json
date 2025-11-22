@@ -9,6 +9,7 @@
   "ionization_energy": 6.194,
   "electronegativity": 1.38,
   "atomic_radius": 175,
+  "covalent_radius": 196,
   "melting_point": 1405,
   "boiling_point": 4404,
   "density": 19.1,
@@ -28,7 +29,7 @@
     {
       "mass_number": 235,
       "neutrons": 143,
-      "abundance": 0.720,
+      "abundance": 0.72,
       "is_stable": false,
       "half_life": "703.8 million years"
     }

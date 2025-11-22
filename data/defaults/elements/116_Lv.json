@@ -9,6 +9,7 @@
   "ionization_energy": 5.3,
   "electronegativity": 2.0,
   "atomic_radius": 175,
+  "covalent_radius": 175,
   "melting_point": 700,
   "boiling_point": 1100,
   "density": 12.9,

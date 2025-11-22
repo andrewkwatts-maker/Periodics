@@ -6,9 +6,10 @@
   "block": "p",
   "period": 6,
   "group": 18,
-  "ionization_energy": 10.74850,
+  "ionization_energy": 10.7485,
   "electronegativity": 2.2,
   "atomic_radius": 120,
+  "covalent_radius": 150,
   "melting_point": 202,
   "boiling_point": 211,
   "density": 0.00973,
@@ -18,6 +19,12 @@
   "primary_emission_wavelength": 745.0,
   "visible_emission_wavelength": 550.0,
   "isotopes": [
-    {"mass_number": 222, "neutrons": 136, "abundance": 0, "is_stable": false, "half_life": "3.82 days"}
+    {
+      "mass_number": 222,
+      "neutrons": 136,
+      "abundance": 0,
+      "is_stable": false,
+      "half_life": "3.82 days"
+    }
   ]
 }

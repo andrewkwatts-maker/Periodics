@@ -2,13 +2,14 @@
   "symbol": "Bi",
   "name": "Bismuth",
   "atomic_number": 83,
-  "atomic_mass": 208.980,
+  "atomic_mass": 208.98,
   "block": "p",
   "period": 6,
   "group": 15,
   "ionization_energy": 7.28556,
   "electronegativity": 2.02,
   "atomic_radius": 143,
+  "covalent_radius": 148,
   "melting_point": 545,
   "boiling_point": 1837,
   "density": 9.78,
@@ -18,6 +19,12 @@
   "primary_emission_wavelength": 306.8,
   "visible_emission_wavelength": 472.3,
   "isotopes": [
-    {"mass_number": 209, "neutrons": 126, "abundance": 100, "is_stable": false, "half_life": "2.01e19 years"}
+    {
+      "mass_number": 209,
+      "neutrons": 126,
+      "abundance": 100,
+      "is_stable": false,
+      "half_life": "2.01e19 years"
+    }
   ]
 }

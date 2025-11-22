@@ -9,6 +9,7 @@
   "ionization_energy": 7.092,
   "electronegativity": 2.16,
   "atomic_radius": 190,
+  "covalent_radius": 154,
   "melting_point": 2896,
   "boiling_point": 4912,
   "density": 10.28,
@@ -18,12 +19,54 @@
   "primary_emission_wavelength": 386.4,
   "visible_emission_wavelength": 386.4,
   "isotopes": [
-    {"mass_number": 92, "neutrons": 50, "abundance": 14.65, "is_stable": true, "half_life": null},
-    {"mass_number": 94, "neutrons": 52, "abundance": 9.19, "is_stable": true, "half_life": null},
-    {"mass_number": 95, "neutrons": 53, "abundance": 15.87, "is_stable": true, "half_life": null},
-    {"mass_number": 96, "neutrons": 54, "abundance": 16.67, "is_stable": true, "half_life": null},
-    {"mass_number": 97, "neutrons": 55, "abundance": 9.58, "is_stable": true, "half_life": null},
-    {"mass_number": 98, "neutrons": 56, "abundance": 24.29, "is_stable": true, "half_life": null},
-    {"mass_number": 100, "neutrons": 58, "abundance": 9.74, "is_stable": true, "half_life": null}
+    {
+      "mass_number": 92,
+      "neutrons": 50,
+      "abundance": 14.65,
+      "is_stable": true,
+      "half_life": null
+    },
+    {
+      "mass_number": 94,
+      "neutrons": 52,
+      "abundance": 9.19,
+      "is_stable": true,
+      "half_life": null
+    },
+    {
+      "mass_number": 95,
+      "neutrons": 53,
+      "abundance": 15.87,
+      "is_stable": true,
+      "half_life": null
+    },
+    {
+      "mass_number": 96,
+      "neutrons": 54,
+      "abundance": 16.67,
+      "is_stable": true,
+      "half_life": null
+    },
+    {
+      "mass_number": 97,
+      "neutrons": 55,
+      "abundance": 9.58,
+      "is_stable": true,
+      "half_life": null
+    },
+    {
+      "mass_number": 98,
+      "neutrons": 56,
+      "abundance": 24.29,
+      "is_stable": true,
+      "half_life": null
+    },
+    {
+      "mass_number": 100,
+      "neutrons": 58,
+      "abundance": 9.74,
+      "is_stable": true,
+      "half_life": null
+    }
   ]
 }
