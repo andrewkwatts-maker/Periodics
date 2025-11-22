@@ -25,6 +25,25 @@
         {"From": "C", "To": "O", "Type": "Single", "Length_pm": 136, "Index": 6},
         {"From": "O", "To": "H", "Type": "Single", "Length_pm": 97, "Index": 7}
     ],
+    "Atoms3D": [
+        {"element": "C", "x": -1.27, "y": 0.0, "z": 0.0, "index": 0},
+        {"element": "C", "x": 0.27, "y": 0.0, "z": 0.0, "index": 1},
+        {"element": "O", "x": 0.89, "y": 1.07, "z": 0.0, "index": 2},
+        {"element": "O", "x": 0.89, "y": -1.18, "z": 0.0, "index": 3},
+        {"element": "H", "x": -1.63, "y": 0.513, "z": 0.889, "index": 4},
+        {"element": "H", "x": -1.63, "y": 0.513, "z": -0.889, "index": 5},
+        {"element": "H", "x": -1.63, "y": -1.026, "z": 0.0, "index": 6},
+        {"element": "H", "x": 1.85, "y": -1.18, "z": 0.0, "index": 7}
+    ],
+    "Bonds3D": [
+        {"from": 0, "to": 1, "type": "single", "length_A": 1.54},
+        {"from": 1, "to": 2, "type": "double", "length_A": 1.23},
+        {"from": 1, "to": 3, "type": "single", "length_A": 1.36},
+        {"from": 0, "to": 4, "type": "single", "length_A": 1.09},
+        {"from": 0, "to": 5, "type": "single", "length_A": 1.09},
+        {"from": 0, "to": 6, "type": "single", "length_A": 1.09},
+        {"from": 3, "to": 7, "type": "single", "length_A": 0.97}
+    ],
     "DipoleMoment_D": 1.74,
     "ElectronConfiguration": "C: 1s2 2s2 2p2, H: 1s1, O: 1s2 2s2 2p4",
     "Applications": ["Vinegar", "Chemical synthesis", "Preservative", "Descaling agent"],

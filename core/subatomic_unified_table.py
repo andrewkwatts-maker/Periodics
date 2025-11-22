@@ -46,6 +46,8 @@ class SubatomicUnifiedTable(QWidget):
         # Filters
         self.show_baryons = True
         self.show_mesons = True
+        self.show_stable = True
+        self.show_unstable = True
         self.charge_filter = None  # None = show all, or specific charge
 
         # Zoom and pan
@@ -73,10 +75,12 @@ class SubatomicUnifiedTable(QWidget):
         self._needs_layout_update = True
         self.update()
 
-    def set_filter(self, show_baryons=True, show_mesons=True, charge=None):
+    def set_filter(self, show_baryons=True, show_mesons=True, show_stable=True, show_unstable=True, charge=None):
         """Set particle filters"""
         self.show_baryons = show_baryons
         self.show_mesons = show_mesons
+        self.show_stable = show_stable
+        self.show_unstable = show_unstable
         self.charge_filter = charge
         self._needs_layout_update = True
         self.update()
@@ -89,6 +93,14 @@ class SubatomicUnifiedTable(QWidget):
             if p.get('_is_baryon') and not self.show_baryons:
                 continue
             if p.get('_is_meson') and not self.show_mesons:
+                continue
+
+            # Stability filter
+            stability = p.get('Stability', 'Unstable')
+            is_stable = stability == 'Stable'
+            if is_stable and not self.show_stable:
+                continue
+            if not is_stable and not self.show_unstable:
                 continue
 
             # Charge filter

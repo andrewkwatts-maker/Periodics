@@ -17,6 +17,13 @@
     "Bonds": [
         {"From": "O", "To": "O", "Type": "Double", "Length_pm": 121, "Index": 1}
     ],
+    "Atoms3D": [
+        {"element": "O", "x": -0.605, "y": 0.0, "z": 0.0, "index": 0},
+        {"element": "O", "x": 0.605, "y": 0.0, "z": 0.0, "index": 1}
+    ],
+    "Bonds3D": [
+        {"from": 0, "to": 1, "type": "double", "length_A": 1.21}
+    ],
     "DipoleMoment_D": 0.0,
     "ElectronConfiguration": "O: 1s2 2s2 2p4",
     "Applications": ["Respiration", "Combustion", "Medical oxygen", "Steel production"],

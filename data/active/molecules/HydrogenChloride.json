@@ -18,6 +18,13 @@
     "Bonds": [
         {"From": "H", "To": "Cl", "Type": "Single", "Length_pm": 127, "Index": 1}
     ],
+    "Atoms3D": [
+        {"element": "H", "x": 0.0, "y": 0.0, "z": 0.0, "index": 0},
+        {"element": "Cl", "x": 1.27, "y": 0.0, "z": 0.0, "index": 1}
+    ],
+    "Bonds3D": [
+        {"from": 0, "to": 1, "type": "single", "length_A": 1.27}
+    ],
     "DipoleMoment_D": 1.08,
     "ElectronConfiguration": "H: 1s1, Cl: 1s2 2s2 2p6 3s2 3p5",
     "Applications": ["Hydrochloric acid production", "Chemical synthesis", "pH control", "Metal cleaning"],

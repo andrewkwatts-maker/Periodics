@@ -457,6 +457,9 @@ class MoleculeControlPanel(QWidget):
     reset_requested = Signal()
     create_requested = Signal()
 
+    # 3D rotation signal: pitch, yaw, roll (in degrees)
+    rotation_changed = Signal(float, float, float)
+
     def __init__(self, table_widget):
         super().__init__()
         self.table = table_widget
@@ -500,6 +503,9 @@ class MoleculeControlPanel(QWidget):
 
         # View Controls
         layout.addWidget(self._create_view_controls_group())
+
+        # 3D Rotation Controls
+        layout.addWidget(self._create_rotation_controls_group())
 
         # Data Management
         layout.addWidget(self._create_data_management_group())
@@ -821,6 +827,136 @@ class MoleculeControlPanel(QWidget):
 
         return collapsible
 
+    def _create_rotation_controls_group(self):
+        """Create 3D rotation controls group with pitch, yaw, roll sliders"""
+        collapsible = CollapsibleBox("3D Rotation Controls", "#ff7043")
+
+        slider_style = """
+            QSlider::groove:horizontal {
+                height: 6px;
+                background: rgba(60, 60, 80, 200);
+                border-radius: 3px;
+            }
+            QSlider::handle:horizontal {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                           stop:0 #ff7043, stop:1 #ff5722);
+                width: 16px;
+                height: 16px;
+                margin: -5px 0;
+                border-radius: 8px;
+            }
+            QSlider::sub-page:horizontal {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                                           stop:0 #ff7043, stop:1 #ff5722);
+                border-radius: 3px;
+            }
+        """
+
+        # Pitch slider (X-axis rotation)
+        pitch_container = QWidget()
+        pitch_layout = QHBoxLayout(pitch_container)
+        pitch_layout.setContentsMargins(0, 0, 0, 0)
+        pitch_layout.setSpacing(8)
+
+        pitch_label = QLabel("Pitch (X):")
+        pitch_label.setStyleSheet("color: white; font-weight: bold; font-size: 10px; min-width: 60px;")
+        pitch_layout.addWidget(pitch_label)
+
+        self.pitch_slider = QSlider(Qt.Orientation.Horizontal)
+        self.pitch_slider.setMinimum(-180)
+        self.pitch_slider.setMaximum(180)
+        self.pitch_slider.setValue(0)
+        self.pitch_slider.setStyleSheet(slider_style)
+        self.pitch_slider.valueChanged.connect(self._on_rotation_changed)
+        pitch_layout.addWidget(self.pitch_slider)
+
+        self.pitch_display = QLabel("0")
+        self.pitch_display.setStyleSheet("color: #ff7043; font-weight: bold; font-size: 10px; min-width: 35px;")
+        pitch_layout.addWidget(self.pitch_display)
+
+        collapsible.content_layout.addWidget(pitch_container)
+
+        # Yaw slider (Y-axis rotation)
+        yaw_container = QWidget()
+        yaw_layout = QHBoxLayout(yaw_container)
+        yaw_layout.setContentsMargins(0, 0, 0, 0)
+        yaw_layout.setSpacing(8)
+
+        yaw_label = QLabel("Yaw (Y):")
+        yaw_label.setStyleSheet("color: white; font-weight: bold; font-size: 10px; min-width: 60px;")
+        yaw_layout.addWidget(yaw_label)
+
+        self.yaw_slider = QSlider(Qt.Orientation.Horizontal)
+        self.yaw_slider.setMinimum(-180)
+        self.yaw_slider.setMaximum(180)
+        self.yaw_slider.setValue(0)
+        self.yaw_slider.setStyleSheet(slider_style)
+        self.yaw_slider.valueChanged.connect(self._on_rotation_changed)
+        yaw_layout.addWidget(self.yaw_slider)
+
+        self.yaw_display = QLabel("0")
+        self.yaw_display.setStyleSheet("color: #ff7043; font-weight: bold; font-size: 10px; min-width: 35px;")
+        yaw_layout.addWidget(self.yaw_display)
+
+        collapsible.content_layout.addWidget(yaw_container)
+
+        # Roll slider (Z-axis rotation)
+        roll_container = QWidget()
+        roll_layout = QHBoxLayout(roll_container)
+        roll_layout.setContentsMargins(0, 0, 0, 0)
+        roll_layout.setSpacing(8)
+
+        roll_label = QLabel("Roll (Z):")
+        roll_label.setStyleSheet("color: white; font-weight: bold; font-size: 10px; min-width: 60px;")
+        roll_layout.addWidget(roll_label)
+
+        self.roll_slider = QSlider(Qt.Orientation.Horizontal)
+        self.roll_slider.setMinimum(-180)
+        self.roll_slider.setMaximum(180)
+        self.roll_slider.setValue(0)
+        self.roll_slider.setStyleSheet(slider_style)
+        self.roll_slider.valueChanged.connect(self._on_rotation_changed)
+        roll_layout.addWidget(self.roll_slider)
+
+        self.roll_display = QLabel("0")
+        self.roll_display.setStyleSheet("color: #ff7043; font-weight: bold; font-size: 10px; min-width: 35px;")
+        roll_layout.addWidget(self.roll_display)
+
+        collapsible.content_layout.addWidget(roll_container)
+
+        # Reset rotation button
+        reset_btn = QPushButton("Reset Rotation")
+        reset_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                           stop:0 #ff7043, stop:1 #ff5722);
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 8px 16px;
+                font-weight: bold;
+                margin-top: 10px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                           stop:0 #ff8a65, stop:1 #ff7043);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                           stop:0 #f4511e, stop:1 #e64a19);
+            }
+        """)
+        reset_btn.clicked.connect(self._on_reset_rotation)
+        collapsible.content_layout.addWidget(reset_btn)
+
+        # Info label
+        rotation_info = QLabel("Rotate molecular structures in 3D space.\nValues in degrees (-180 to 180).")
+        rotation_info.setStyleSheet("color: rgba(255,255,255,150); font-size: 9px; margin-top: 5px;")
+        rotation_info.setWordWrap(True)
+        collapsible.content_layout.addWidget(rotation_info)
+
+        return collapsible
+
     def _create_data_management_group(self):
         """Create data management controls group"""
         group = QGroupBox("Data Management")
@@ -1014,6 +1150,31 @@ class MoleculeControlPanel(QWidget):
         """Reset view to defaults"""
         if hasattr(self.table, 'reset_view'):
             self.table.reset_view()
+
+    def _on_rotation_changed(self):
+        """Handle rotation slider changes"""
+        pitch = self.pitch_slider.value()
+        yaw = self.yaw_slider.value()
+        roll = self.roll_slider.value()
+
+        # Update display labels
+        self.pitch_display.setText(f"{pitch}")
+        self.yaw_display.setText(f"{yaw}")
+        self.roll_display.setText(f"{roll}")
+
+        # Emit rotation signal
+        self.rotation_changed.emit(float(pitch), float(yaw), float(roll))
+
+        # Notify table widget directly
+        if hasattr(self.table, 'set_rotation'):
+            self.table.set_rotation(float(pitch), float(yaw), float(roll))
+
+    def _on_reset_rotation(self):
+        """Reset all rotation sliders to zero"""
+        self.pitch_slider.setValue(0)
+        self.yaw_slider.setValue(0)
+        self.roll_slider.setValue(0)
+        # The valueChanged signal will trigger _on_rotation_changed
 
     def _on_clear_filters(self):
         """Clear all filters"""

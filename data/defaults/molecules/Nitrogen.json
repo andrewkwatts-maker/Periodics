@@ -17,6 +17,13 @@
     "Bonds": [
         {"From": "N", "To": "N", "Type": "Triple", "Length_pm": 110, "Index": 1}
     ],
+    "Atoms3D": [
+        {"element": "N", "x": -0.55, "y": 0.0, "z": 0.0, "index": 0},
+        {"element": "N", "x": 0.55, "y": 0.0, "z": 0.0, "index": 1}
+    ],
+    "Bonds3D": [
+        {"from": 0, "to": 1, "type": "triple", "length_A": 1.10}
+    ],
     "DipoleMoment_D": 0.0,
     "ElectronConfiguration": "N: 1s2 2s2 2p3",
     "Applications": ["Inert atmosphere", "Cryogenics", "Fertilizer production", "Food preservation"],

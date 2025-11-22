@@ -26,6 +26,27 @@
         {"From": "C", "To": "O", "Type": "Single", "Length_pm": 143, "Index": 7},
         {"From": "O", "To": "H", "Type": "Single", "Length_pm": 96, "Index": 8}
     ],
+    "Atoms3D": [
+        {"element": "C", "x": -0.97, "y": 0.0, "z": 0.0, "index": 0},
+        {"element": "C", "x": 0.57, "y": 0.0, "z": 0.0, "index": 1},
+        {"element": "O", "x": 1.10, "y": 1.32, "z": 0.0, "index": 2},
+        {"element": "H", "x": -1.33, "y": 0.513, "z": 0.889, "index": 3},
+        {"element": "H", "x": -1.33, "y": 0.513, "z": -0.889, "index": 4},
+        {"element": "H", "x": -1.33, "y": -1.026, "z": 0.0, "index": 5},
+        {"element": "H", "x": 0.93, "y": -0.513, "z": 0.889, "index": 6},
+        {"element": "H", "x": 0.93, "y": -0.513, "z": -0.889, "index": 7},
+        {"element": "H", "x": 2.06, "y": 1.32, "z": 0.0, "index": 8}
+    ],
+    "Bonds3D": [
+        {"from": 0, "to": 1, "type": "single", "length_A": 1.54},
+        {"from": 1, "to": 2, "type": "single", "length_A": 1.43},
+        {"from": 0, "to": 3, "type": "single", "length_A": 1.09},
+        {"from": 0, "to": 4, "type": "single", "length_A": 1.09},
+        {"from": 0, "to": 5, "type": "single", "length_A": 1.09},
+        {"from": 1, "to": 6, "type": "single", "length_A": 1.09},
+        {"from": 1, "to": 7, "type": "single", "length_A": 1.09},
+        {"from": 2, "to": 8, "type": "single", "length_A": 0.96}
+    ],
     "DipoleMoment_D": 1.69,
     "ElectronConfiguration": "C: 1s2 2s2 2p2, H: 1s1, O: 1s2 2s2 2p4",
     "Applications": ["Alcoholic beverages", "Fuel", "Solvent", "Disinfectant"],

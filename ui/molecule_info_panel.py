@@ -15,8 +15,44 @@ from core.molecule_enums import (MolecularGeometry, BondType, MoleculePolarity,
 from data.data_manager import DataCategory
 
 
+def rotate_point_3d(x, y, z, pitch, yaw, roll):
+    """
+    Apply 3D rotation and return transformed coordinates.
+
+    Args:
+        x, y, z: Original 3D coordinates (relative to center)
+        pitch: Rotation around X-axis (tilt up/down) in degrees
+        yaw: Rotation around Y-axis (turn left/right) in degrees
+        roll: Rotation around Z-axis (spin) in degrees
+
+    Returns:
+        Tuple of (x2d, y2d, z_depth) for 2D projection with depth info
+    """
+    # Convert to radians
+    pitch_rad = math.radians(pitch)
+    yaw_rad = math.radians(yaw)
+    roll_rad = math.radians(roll)
+
+    # Rotation around X-axis (pitch)
+    y1 = y * math.cos(pitch_rad) - z * math.sin(pitch_rad)
+    z1 = y * math.sin(pitch_rad) + z * math.cos(pitch_rad)
+    x1 = x
+
+    # Rotation around Y-axis (yaw)
+    x2 = x1 * math.cos(yaw_rad) + z1 * math.sin(yaw_rad)
+    z2 = -x1 * math.sin(yaw_rad) + z1 * math.cos(yaw_rad)
+    y2 = y1
+
+    # Rotation around Z-axis (roll)
+    x3 = x2 * math.cos(roll_rad) - y2 * math.sin(roll_rad)
+    y3 = x2 * math.sin(roll_rad) + y2 * math.cos(roll_rad)
+    z3 = z2
+
+    return x3, y3, z3
+
+
 class MoleculeStructureWidget(QFrame):
-    """Widget to display molecular structure diagram"""
+    """Widget to display molecular structure diagram with 3D rotation support"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -29,10 +65,21 @@ class MoleculeStructureWidget(QFrame):
                 border-radius: 12px;
             }
         """)
+        # 3D rotation angles (in degrees)
+        self.pitch = 0.0
+        self.yaw = 0.0
+        self.roll = 0.0
 
     def set_molecule(self, mol):
         """Set molecule to display"""
         self.molecule = mol
+        self.update()
+
+    def set_rotation(self, pitch, yaw, roll):
+        """Set 3D rotation angles (in degrees)"""
+        self.pitch = pitch
+        self.yaw = yaw
+        self.roll = roll
         self.update()
 
     def paintEvent(self, event):
@@ -78,101 +125,137 @@ class MoleculeStructureWidget(QFrame):
         painter.end()
 
     def _calculate_atom_positions(self, composition, geometry, cx, cy, radius):
-        """Calculate atom positions based on geometry"""
-        positions = []
+        """Calculate atom positions based on geometry with 3D rotation support"""
+        positions_3d = []
         total_atoms = sum(c.get('Count', 1) for c in composition)
 
         if total_atoms == 0:
-            return positions
+            return []
 
-        # Different arrangements based on geometry
+        # Generate initial 3D positions based on geometry
         if geometry == 'Linear':
-            # Horizontal line
+            # Horizontal line along X-axis
             step = radius * 1.5 / max(total_atoms - 1, 1) if total_atoms > 1 else 0
-            start_x = cx - (total_atoms - 1) * step / 2
+            start_x = -(total_atoms - 1) * step / 2
             atom_idx = 0
             for comp in composition:
                 element = comp.get('Element', '?')
                 count = comp.get('Count', 1)
                 for i in range(count):
-                    positions.append({
+                    positions_3d.append({
                         'element': element,
                         'x': start_x + atom_idx * step,
-                        'y': cy,
+                        'y': 0,
+                        'z': 0,
                         'radius': self._get_atom_radius(element)
                     })
                     atom_idx += 1
 
         elif geometry == 'Bent':
-            # V-shape
-            angle = math.radians(104.5)  # Typical bent angle
+            # V-shape in XY plane with Z variation
+            angle = math.radians(104.5)
             central_atom = composition[0] if composition else {'Element': '?'}
-            positions.append({
+            positions_3d.append({
                 'element': central_atom.get('Element', '?'),
-                'x': cx,
-                'y': cy,
+                'x': 0, 'y': 0, 'z': 0,
                 'radius': self._get_atom_radius(central_atom.get('Element', '?'))
             })
-            # Add peripheral atoms
             if len(composition) > 1:
                 peripheral = composition[1]
                 count = peripheral.get('Count', 1)
                 for i in range(count):
                     a = -math.pi/2 + (i - (count-1)/2) * angle / max(count-1, 1)
-                    positions.append({
+                    positions_3d.append({
                         'element': peripheral.get('Element', '?'),
-                        'x': cx + radius * 0.7 * math.cos(a),
-                        'y': cy + radius * 0.7 * math.sin(a),
+                        'x': radius * 0.7 * math.cos(a),
+                        'y': radius * 0.7 * math.sin(a),
+                        'z': radius * 0.1 * (i - (count-1)/2),  # Slight Z offset
                         'radius': self._get_atom_radius(peripheral.get('Element', '?'))
                     })
 
-        elif geometry in ['Tetrahedral', 'Trigonal Pyramidal']:
-            # 3D projection
+        elif geometry == 'Tetrahedral':
+            # True tetrahedral 3D arrangement
             central = composition[0] if composition else {'Element': '?'}
-            positions.append({
+            positions_3d.append({
                 'element': central.get('Element', '?'),
-                'x': cx,
-                'y': cy,
+                'x': 0, 'y': 0, 'z': 0,
                 'radius': self._get_atom_radius(central.get('Element', '?'))
             })
-            # Peripheral atoms in a circle
+            # Tetrahedral angles
+            tet_angle = math.acos(-1/3)  # ~109.47 degrees
             atom_idx = 0
             for comp in composition[1:] if len(composition) > 1 else []:
                 element = comp.get('Element', '?')
                 count = comp.get('Count', 1)
-                base_angle = 2 * math.pi / max(sum(c.get('Count', 1) for c in composition[1:]), 1)
                 for i in range(count):
-                    a = atom_idx * base_angle - math.pi/2
-                    positions.append({
+                    if atom_idx == 0:
+                        x, y, z = 0, 0, radius * 0.65
+                    elif atom_idx == 1:
+                        x = radius * 0.65 * math.sin(tet_angle)
+                        y = 0
+                        z = -radius * 0.65 * math.cos(tet_angle)
+                    elif atom_idx == 2:
+                        x = -radius * 0.65 * math.sin(tet_angle) * math.cos(math.pi/3)
+                        y = radius * 0.65 * math.sin(tet_angle) * math.sin(math.pi/3)
+                        z = -radius * 0.65 * math.cos(tet_angle)
+                    else:
+                        x = -radius * 0.65 * math.sin(tet_angle) * math.cos(math.pi/3)
+                        y = -radius * 0.65 * math.sin(tet_angle) * math.sin(math.pi/3)
+                        z = -radius * 0.65 * math.cos(tet_angle)
+                    positions_3d.append({
                         'element': element,
-                        'x': cx + radius * 0.65 * math.cos(a),
-                        'y': cy + radius * 0.65 * math.sin(a),
+                        'x': x, 'y': y, 'z': z,
+                        'radius': self._get_atom_radius(element)
+                    })
+                    atom_idx += 1
+
+        elif geometry == 'Trigonal Pyramidal':
+            # Pyramidal 3D arrangement
+            central = composition[0] if composition else {'Element': '?'}
+            positions_3d.append({
+                'element': central.get('Element', '?'),
+                'x': 0, 'y': 0, 'z': radius * 0.2,
+                'radius': self._get_atom_radius(central.get('Element', '?'))
+            })
+            atom_idx = 0
+            for comp in composition[1:] if len(composition) > 1 else []:
+                element = comp.get('Element', '?')
+                count = comp.get('Count', 1)
+                for i in range(count):
+                    a = atom_idx * 2 * math.pi / 3 - math.pi/2
+                    positions_3d.append({
+                        'element': element,
+                        'x': radius * 0.55 * math.cos(a),
+                        'y': radius * 0.55 * math.sin(a),
+                        'z': -radius * 0.3,
                         'radius': self._get_atom_radius(element)
                     })
                     atom_idx += 1
 
         elif geometry == 'Trigonal Planar':
-            # Triangle arrangement
+            # Triangle arrangement in XY plane
             central = composition[0] if composition else {'Element': '?'}
-            positions.append({
+            positions_3d.append({
                 'element': central.get('Element', '?'),
-                'x': cx,
-                'y': cy,
+                'x': 0, 'y': 0, 'z': 0,
                 'radius': self._get_atom_radius(central.get('Element', '?'))
             })
-            for i, comp in enumerate(composition[1:] if len(composition) > 1 else []):
+            atom_idx = 0
+            for comp in composition[1:] if len(composition) > 1 else []:
                 count = comp.get('Count', 1)
                 for j in range(count):
-                    a = (i * count + j) * 2 * math.pi / 3 - math.pi/2
-                    positions.append({
+                    a = atom_idx * 2 * math.pi / 3 - math.pi/2
+                    positions_3d.append({
                         'element': comp.get('Element', '?'),
-                        'x': cx + radius * 0.6 * math.cos(a),
-                        'y': cy + radius * 0.6 * math.sin(a),
+                        'x': radius * 0.6 * math.cos(a),
+                        'y': radius * 0.6 * math.sin(a),
+                        'z': 0,
                         'radius': self._get_atom_radius(comp.get('Element', '?'))
                     })
+                    atom_idx += 1
 
         elif geometry == 'Planar Hexagonal':
-            # Hexagon (like benzene)
+            # Hexagon in XY plane (like benzene)
             atom_idx = 0
             for comp in composition:
                 element = comp.get('Element', '?')
@@ -180,37 +263,60 @@ class MoleculeStructureWidget(QFrame):
                 for i in range(count):
                     a = atom_idx * math.pi / 3 - math.pi/2
                     r = radius * 0.6 if element == 'C' else radius * 0.85
-                    positions.append({
+                    positions_3d.append({
                         'element': element,
-                        'x': cx + r * math.cos(a),
-                        'y': cy + r * math.sin(a),
+                        'x': r * math.cos(a),
+                        'y': r * math.sin(a),
+                        'z': 0,
                         'radius': self._get_atom_radius(element)
                     })
                     atom_idx += 1
 
         else:
-            # Default circular arrangement
+            # Default circular arrangement with slight Z variation
             atom_idx = 0
             for comp in composition:
                 element = comp.get('Element', '?')
                 count = comp.get('Count', 1)
                 for i in range(count):
                     if total_atoms == 1:
-                        positions.append({
+                        positions_3d.append({
                             'element': element,
-                            'x': cx,
-                            'y': cy,
+                            'x': 0, 'y': 0, 'z': 0,
                             'radius': self._get_atom_radius(element)
                         })
                     else:
                         a = atom_idx * 2 * math.pi / total_atoms - math.pi/2
-                        positions.append({
+                        positions_3d.append({
                             'element': element,
-                            'x': cx + radius * 0.6 * math.cos(a),
-                            'y': cy + radius * 0.6 * math.sin(a),
+                            'x': radius * 0.6 * math.cos(a),
+                            'y': radius * 0.6 * math.sin(a),
+                            'z': radius * 0.15 * math.sin(atom_idx * math.pi / 2),
                             'radius': self._get_atom_radius(element)
                         })
                     atom_idx += 1
+
+        # Apply 3D rotation and project to 2D
+        positions = []
+        for atom in positions_3d:
+            x_rot, y_rot, z_rot = rotate_point_3d(
+                atom['x'], atom['y'], atom['z'],
+                self.pitch, self.yaw, self.roll
+            )
+            # Simple orthographic projection (just use x, y)
+            # Add depth-based scaling for perspective effect
+            depth_scale = 1.0 + z_rot / (radius * 4)  # Subtle perspective
+            positions.append({
+                'element': atom['element'],
+                'x': cx + x_rot,
+                'y': cy + y_rot,
+                'z': z_rot,  # Keep Z for depth sorting
+                'radius': atom['radius'] * max(0.6, min(1.4, depth_scale)),
+                'depth_scale': depth_scale
+            })
+
+        # Sort by Z depth (draw far atoms first)
+        positions.sort(key=lambda p: p.get('z', 0))
 
         return positions
 

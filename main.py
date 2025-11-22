@@ -263,6 +263,11 @@ class PeriodicsMainWindow(QMainWindow):
 
         self.molecule_table.molecule_selected.connect(self._on_molecule_selected)
 
+        # Connect rotation controls to info panel structure widget
+        self.molecule_control.rotation_changed.connect(
+            self.molecule_info.structure_widget.set_rotation
+        )
+
         # Connect data management signals
         self.molecule_control.add_requested.connect(self._on_molecule_add)
         self.molecule_control.edit_requested.connect(self._on_molecule_edit)

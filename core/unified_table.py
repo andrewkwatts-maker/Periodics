@@ -302,6 +302,138 @@ class UnifiedTable(QWidget):
         # Mode descriptions are now shown in mode-specific control panel widgets
         pass
 
+    def set_property_mapping(self, property_key, property_name):
+        """Map a visual property encoding to a data property.
+
+        Args:
+            property_key: Visual encoding key (e.g., 'fill_color', 'border_color', 'border_size',
+                         'ring_color', 'ring_size', 'glow_color', 'glow_intensity',
+                         'symbol_text_color', 'atomic_number_text_color')
+            property_name: Data property name to map to (e.g., 'ionization', 'electronegativity',
+                          'melting', 'boiling', 'radius', 'density', 'electron_affinity',
+                          'valence', 'atomic_number', 'wavelength', 'emission_wavelength',
+                          'visible_emission_wavelength', 'ionization_wavelength', 'spectrum',
+                          'block', 'none')
+        """
+        # Map property_key to the correct attribute name
+        property_map = {
+            'fill_color': 'fill_property',
+            'border_color': 'border_color_property',
+            'border_size': 'border_size_property',
+            'ring_color': 'ring_property',
+            'ring_size': 'ring_size_property',
+            'glow_color': 'glow_property',
+            'glow_intensity': 'glow_intensity_property',
+            'symbol_text_color': 'symbol_text_color_property',
+            'atomic_number_text_color': 'atomic_number_text_color_property',
+        }
+
+        attr_name = property_map.get(property_key)
+        if attr_name:
+            setattr(self, attr_name, property_name)
+            # Also update legacy aliases for backwards compatibility
+            if property_key == 'glow_color':
+                self.glow_color_property = property_name
+            elif property_key == 'ring_color':
+                self.inner_ring_property = property_name
+            elif property_key == 'border_size':
+                self.border_property = property_name  # Legacy alias
+            elif property_key == 'glow_intensity':
+                self.glow_radius_property = property_name
+            self.update()
+
+    def set_property_filter_range(self, property_key, min_val, max_val):
+        """Set the filter range for a property. Elements outside this range will be greyed out.
+
+        Args:
+            property_key: Visual encoding key (e.g., 'fill_color', 'border_color')
+            min_val: Minimum value for the filter
+            max_val: Maximum value for the filter
+        """
+        # Map property_key to the data property name being used for that encoding
+        property_map = {
+            'fill_color': 'fill_property',
+            'border_color': 'border_color_property',
+            'border_size': 'border_size_property',
+            'ring_color': 'ring_property',
+            'ring_size': 'ring_size_property',
+            'glow_color': 'glow_property',
+            'glow_intensity': 'glow_intensity_property',
+            'symbol_text_color': 'symbol_text_color_property',
+            'atomic_number_text_color': 'atomic_number_text_color_property',
+        }
+
+        attr_name = property_map.get(property_key)
+        if attr_name:
+            # Get the property name being mapped
+            prop_name = getattr(self, attr_name, 'none')
+
+            # Update the filter for that property
+            if prop_name in self.filters:
+                self.filters[prop_name]['min'] = min_val
+                self.filters[prop_name]['max'] = max_val
+                self.filters[prop_name]['active'] = True
+            else:
+                # Create filter entry if it doesn't exist
+                self.filters[prop_name] = {
+                    'min': min_val,
+                    'max': max_val,
+                    'active': True
+                }
+            self.update()
+
+    def set_gradient_colors(self, property_key, start_color, end_color):
+        """Set custom gradient colors for a visual property encoding.
+
+        Args:
+            property_key: Visual encoding key (e.g., 'fill_color', 'border_color')
+            start_color: Start color (QColor or hex string like '#6495ED')
+            end_color: End color (QColor or hex string like '#FF6347')
+        """
+        # Convert hex strings to QColor if needed
+        if isinstance(start_color, str):
+            start_color = QColor(start_color)
+        if isinstance(end_color, str):
+            end_color = QColor(end_color)
+
+        # Map property_key to gradient attribute names
+        gradient_map = {
+            'fill_color': ('custom_fill_gradient_start', 'custom_fill_gradient_end'),
+            'border_color': ('custom_border_gradient_start', 'custom_border_gradient_end'),
+            'ring_color': ('custom_ring_gradient_start', 'custom_ring_gradient_end'),
+            'glow_color': ('custom_glow_gradient_start', 'custom_glow_gradient_end'),
+            'symbol_text_color': ('custom_symbol_text_gradient_start', 'custom_symbol_text_gradient_end'),
+            'atomic_number_text_color': ('custom_atomic_number_text_gradient_start', 'custom_atomic_number_text_gradient_end'),
+        }
+
+        if property_key in gradient_map:
+            start_attr, end_attr = gradient_map[property_key]
+            setattr(self, start_attr, start_color)
+            setattr(self, end_attr, end_color)
+            self.update()
+
+    def set_fade_value(self, property_key, fade_value):
+        """Set the fade amount for a visual property encoding.
+
+        Args:
+            property_key: Visual encoding key (e.g., 'fill_color', 'border_color')
+            fade_value: Fade amount from 0.0 (no fade) to 1.0 (fully transparent)
+        """
+        # Map property_key to fade attribute names
+        fade_map = {
+            'fill_color': 'fill_fade',
+            'border_color': 'border_color_fade',
+            'ring_color': 'ring_color_fade',
+            'glow_color': 'glow_color_fade',
+            'symbol_text_color': 'symbol_text_color_fade',
+            'atomic_number_text_color': 'atomic_number_text_color_fade',
+        }
+
+        attr_name = fade_map.get(property_key)
+        if attr_name:
+            setattr(self, attr_name, max(0.0, min(1.0, fade_value)))
+            self.update()
+
     def create_element_data(self):
         """Create base element data from JSON files"""
         # Get the element data loader (loads from JSON files)
