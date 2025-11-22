@@ -26,8 +26,8 @@ class QuarkUnifiedTable(QWidget):
     """Unified widget for displaying particle visualizations in multiple layouts"""
 
     # Signals
-    particle_selected = Signal(dict)  # Emitted when a particle is clicked
-    particle_hovered = Signal(dict)   # Emitted when a particle is hovered
+    quark_selected = Signal(dict)  # Emitted when a quark/particle is clicked
+    quark_hovered = Signal(dict)   # Emitted when a quark/particle is hovered
 
     def __init__(self):
         super().__init__()
@@ -44,8 +44,8 @@ class QuarkUnifiedTable(QWidget):
         self.current_renderer = None
 
         # Interaction state
-        self.hovered_particle = None
-        self.selected_particle = None
+        self.hovered_quark = None
+        self.selected_quark = None
 
         # Visual property mappings
         self.fill_property = "particle_type"
@@ -263,8 +263,8 @@ class QuarkUnifiedTable(QWidget):
             'border_property': self.border_property,
             'glow_property': self.glow_property,
             'order_property': self.order_property,
-            'hovered_particle': self.hovered_particle,
-            'selected_particle': self.selected_particle,
+            'hovered_quark': self.hovered_quark,
+            'selected_quark': self.selected_quark,
             'show_connections': self.show_connections
         }
 
@@ -328,17 +328,17 @@ class QuarkUnifiedTable(QWidget):
             return
 
         # Find particle under mouse
-        old_hovered = self.hovered_particle
-        self.hovered_particle = None
+        old_hovered = self.hovered_quark
+        self.hovered_quark = None
 
         if self.current_renderer:
-            self.hovered_particle = self.current_renderer.get_particle_at_position(
+            self.hovered_quark = self.current_renderer.get_particle_at_position(
                 x, y, self.particles
             )
 
-        if old_hovered != self.hovered_particle:
-            if self.hovered_particle:
-                self.particle_hovered.emit(self.hovered_particle)
+        if old_hovered != self.hovered_quark:
+            if self.hovered_quark:
+                self.quark_hovered.emit(self.hovered_quark)
             self.update()
 
     def mousePressEvent(self, event):
@@ -351,11 +351,11 @@ class QuarkUnifiedTable(QWidget):
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
         elif event.button() == Qt.MouseButton.LeftButton:
             # Select particle
-            if self.hovered_particle:
-                self.selected_particle = self.hovered_particle
-                self.particle_selected.emit(self.selected_particle)
+            if self.hovered_quark:
+                self.selected_quark = self.hovered_quark
+                self.quark_selected.emit(self.selected_quark)
                 # Copy particle data to clipboard
-                clipboard_text = json.dumps(self.selected_particle, indent=2, default=str)
+                clipboard_text = json.dumps(self.selected_quark, indent=2, default=str)
                 QGuiApplication.clipboard().setText(clipboard_text)
                 self.update()
 
@@ -421,3 +421,8 @@ class QuarkUnifiedTable(QWidget):
             self.charge_type_filters = {'positive': True, 'negative': True, 'neutral': True}
         self.charge_type_filters.update(filters)
         self._update_layout()
+
+    def reload_data(self):
+        """Reload particle data from files and refresh the display"""
+        self.load_particle_data()
+        self.update()

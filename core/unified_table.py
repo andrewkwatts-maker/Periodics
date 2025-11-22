@@ -15,7 +15,7 @@ Handles all layout modes and user interactions
 import json
 import math
 from PySide6.QtWidgets import QWidget
-from PySide6.QtCore import Qt, QPointF, QRectF, QTimer
+from PySide6.QtCore import Qt, QPointF, QRectF, QTimer, Signal
 from PySide6.QtGui import (QPainter, QColor, QPen, QBrush, QFont, QPainterPath,
                            QLinearGradient, QRadialGradient, QPolygonF, QGuiApplication)
 
@@ -63,6 +63,11 @@ def normalize_angle(angle):
 
 class UnifiedTable(QWidget):
     """Unified widget that can display both circular and serpentine layouts"""
+
+    # Signals
+    element_selected = Signal(dict)  # Emitted when an element is selected
+    element_hovered = Signal(dict)   # Emitted when an element is hovered
+
     def __init__(self):
         super().__init__()
         self.setMinimumSize(900, 900)
@@ -4544,6 +4549,8 @@ class UnifiedTable(QWidget):
 
         if self.hovered_element:
             self.setCursor(Qt.CursorShape.PointingHandCursor)
+            # Emit hover signal when element changes
+            self.element_hovered.emit(self.hovered_element)
         else:
             self.setCursor(Qt.CursorShape.ArrowCursor)
 
@@ -4599,6 +4606,8 @@ class UnifiedTable(QWidget):
             # If no electron clicked, check for element click
             if not clicked_electron and self.hovered_element:
                 self.selected_element = self.hovered_element
+                # Emit element selected signal
+                self.element_selected.emit(self.selected_element)
 
                 # Copy element data to clipboard
                 clipboard_text = json.dumps(self.selected_element, indent=2, default=str)
@@ -4638,6 +4647,20 @@ class UnifiedTable(QWidget):
             self.create_table_layout()
         elif self.layout_mode == PTLayoutMode.LINEAR:
             self.create_linear_layout()
+
+    def reload_data(self):
+        """Reload element data from files and refresh the display"""
+        self.create_element_data()
+        # Recreate layout based on current mode
+        if self.layout_mode == PTLayoutMode.CIRCULAR:
+            self.create_circular_layout()
+        elif self.layout_mode == PTLayoutMode.SPIRAL or self.layout_mode == PTLayoutMode.SERPENTINE:
+            self.create_serpentine_layout()
+        elif self.layout_mode == PTLayoutMode.TABLE:
+            self.create_table_layout()
+        elif self.layout_mode == PTLayoutMode.LINEAR:
+            self.create_linear_layout()
+        self.update()
 
 
 # Alias for backward compatibility

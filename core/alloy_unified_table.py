@@ -606,3 +606,41 @@ class AlloyUnifiedTable(QWidget):
         self.base_alloys = self.loader.load_all_alloys()
         self._update_layout()
         self.update()
+
+    def set_property_filter(self, property_key, min_val, max_val):
+        """Set filter range for a property. Items outside the range will be grayed out.
+
+        Args:
+            property_key: Visual element key to filter by (fill_color, border_color, etc.)
+            min_val: Minimum value for the filter range
+            max_val: Maximum value for the filter range
+        """
+        if not hasattr(self, 'property_filter_ranges'):
+            self.property_filter_ranges = {}
+        self.property_filter_ranges[property_key] = (min_val, max_val)
+        self.update()
+
+    def set_gradient_colors(self, property_key, start_color, end_color):
+        """Set custom gradient colors for visual property encoding.
+
+        Args:
+            property_key: Visual element key to set gradient for
+            start_color: Start color of the gradient (QColor)
+            end_color: End color of the gradient (QColor)
+        """
+        if not hasattr(self, 'gradient_colors'):
+            self.gradient_colors = {}
+        self.gradient_colors[property_key] = (start_color, end_color)
+        self.update()
+
+    def set_property_fade(self, property_key, fade_value):
+        """Set fade value for items outside the filter range.
+
+        Args:
+            property_key: Visual element key to set fade for
+            fade_value: Fade value from 0.0 (no fade) to 1.0 (fully faded)
+        """
+        if not hasattr(self, 'fade_values'):
+            self.fade_values = {}
+        self.fade_values[property_key] = fade_value
+        self.update()

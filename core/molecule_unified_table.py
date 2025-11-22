@@ -99,6 +99,11 @@ class MoleculeUnifiedTable(QWidget):
         self.pan_y = 0
         self.scroll_offset_y = 0
 
+        # Pan interaction state
+        self.is_panning = False
+        self.pan_start_x = 0
+        self.pan_start_y = 0
+
         # 3D rotation angles (in degrees)
         self.pitch = 0.0
         self.yaw = 0.0
@@ -636,25 +641,47 @@ class MoleculeUnifiedTable(QWidget):
         painter.drawEllipse(QPointF(polarity_x, state_y), 5, 5)
 
     def mouseMoveEvent(self, event):
-        """Handle mouse movement for hover effects"""
-        # Transform mouse position
-        x = (event.position().x() - self.pan_x) / self.zoom_level
-        y = (event.position().y() - self.pan_y + self.scroll_offset_y) / self.zoom_level
+        """Handle mouse movement for panning and hover effects"""
+        if self.is_panning:
+            # Update pan offset
+            dx = event.position().x() - self.pan_start_x
+            dy = event.position().y() - self.pan_start_y
+            self.pan_x += dx
+            self.pan_y += dy
+            self.pan_start_x = event.position().x()
+            self.pan_start_y = event.position().y()
+            self.update()
+        else:
+            # Transform mouse position for hover detection
+            x = (event.position().x() - self.pan_x) / self.zoom_level
+            y = (event.position().y() - self.pan_y + self.scroll_offset_y) / self.zoom_level
 
-        layout = self.layouts.get(self.layout_mode)
-        if layout:
-            mol = layout.get_molecule_at_position(x, y, self.positioned_molecules)
+            layout = self.layouts.get(self.layout_mode)
+            if layout:
+                mol = layout.get_molecule_at_position(x, y, self.positioned_molecules)
 
-            if mol != self.hovered_molecule:
-                self.hovered_molecule = mol
-                if mol:
-                    self.molecule_hovered.emit(mol)
-                self.update()
+                if mol != self.hovered_molecule:
+                    self.hovered_molecule = mol
+                    if mol:
+                        self.molecule_hovered.emit(mol)
+                    self.update()
 
     def mousePressEvent(self, event):
-        """Handle mouse click for selection"""
-        if event.button() == Qt.MouseButton.LeftButton:
-            if self.hovered_molecule:
+        """Handle mouse click for selection and panning"""
+        if event.button() == Qt.MouseButton.MiddleButton:
+            # Middle button: start panning
+            self.is_panning = True
+            self.pan_start_x = event.position().x()
+            self.pan_start_y = event.position().y()
+            self.setCursor(Qt.CursorShape.ClosedHandCursor)
+        elif event.button() == Qt.MouseButton.LeftButton:
+            # Check for Ctrl+left click for panning
+            if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+                self.is_panning = True
+                self.pan_start_x = event.position().x()
+                self.pan_start_y = event.position().y()
+                self.setCursor(Qt.CursorShape.ClosedHandCursor)
+            elif self.hovered_molecule:
                 self.selected_molecule = self.hovered_molecule
                 self.molecule_selected.emit(self.selected_molecule)
                 # Copy molecule data to clipboard
@@ -662,17 +689,26 @@ class MoleculeUnifiedTable(QWidget):
                 QGuiApplication.clipboard().setText(clipboard_text)
                 self.update()
 
+    def mouseReleaseEvent(self, event):
+        """Handle mouse release"""
+        if event.button() == Qt.MouseButton.MiddleButton or event.button() == Qt.MouseButton.LeftButton:
+            if self.is_panning:
+                self.is_panning = False
+                self.setCursor(Qt.CursorShape.ArrowCursor)
+
     def wheelEvent(self, event):
-        """Handle scroll wheel for zooming/scrolling"""
+        """Handle scroll wheel for zooming (default) or scrolling (with Ctrl)"""
+        delta = event.angleDelta().y()
+
         if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-            # Zoom
-            delta = event.angleDelta().y()
-            factor = 1.1 if delta > 0 else 0.9
-            self.zoom_level = max(0.5, min(2.0, self.zoom_level * factor))
-        else:
-            # Scroll
-            delta = event.angleDelta().y()
+            # Ctrl+scroll: vertical scrolling
             self.scroll_offset_y = max(0, self.scroll_offset_y - delta / 2)
+        else:
+            # Default scroll: zoom in/out
+            if delta > 0:
+                self.zoom_level = min(5.0, self.zoom_level * 1.1)  # Zoom in
+            else:
+                self.zoom_level = max(0.2, self.zoom_level / 1.1)  # Zoom out
 
         self.update()
 
@@ -684,9 +720,104 @@ class MoleculeUnifiedTable(QWidget):
         self.scroll_offset_y = 0
         self.update()
 
+    def set_zoom(self, zoom_level):
+        """Set zoom level from external control (e.g., slider)
+
+        Args:
+            zoom_level: Zoom factor (0.2 to 5.0, where 1.0 is default)
+        """
+        self.zoom_level = max(0.2, min(5.0, zoom_level))
+        self.update()
+
     def get_content_height(self):
         """Get the total content height for scrolling"""
         layout = self.layouts.get(self.layout_mode)
         if layout and hasattr(layout, 'get_content_height'):
             return layout.get_content_height(self.positioned_molecules)
         return self.height()
+
+    def set_3d_mode(self, enabled):
+        """Enable or disable 3D molecular structure visualization.
+
+        Args:
+            enabled: Boolean to enable/disable 3D mode
+        """
+        self.show_3d_structure = getattr(self, 'show_3d_structure', False)
+        self.show_3d_structure = enabled
+        self.update()
+
+    def set_show_bonds(self, show):
+        """Toggle bond line visualization.
+
+        Args:
+            show: Boolean to show/hide bond lines
+        """
+        self.show_bonds = getattr(self, 'show_bonds', True)
+        self.show_bonds = show
+        self.update()
+
+    def set_show_labels(self, show):
+        """Toggle atom label visualization.
+
+        Args:
+            show: Boolean to show/hide atom labels
+        """
+        self.show_labels = getattr(self, 'show_labels', True)
+        self.show_labels = show
+        self.update()
+
+    def set_property_mapping(self, property_key, property_name):
+        """Set visual property mapping for a specific visual element.
+
+        Args:
+            property_key: Visual element key (fill_color, border_color, glow_color, symbol_text_color, border_size)
+            property_name: Data property name to map to the visual element
+        """
+        if not hasattr(self, 'property_mappings'):
+            self.property_mappings = {}
+        self.property_mappings[property_key] = property_name
+        self.update()
+
+    def set_property_filter_range(self, property_key, min_val, max_val):
+        """Set filter range for a property. Items outside the range will be grayed out.
+
+        Args:
+            property_key: Visual element key to filter by
+            min_val: Minimum value for the filter range
+            max_val: Maximum value for the filter range
+        """
+        if not hasattr(self, 'property_filter_ranges'):
+            self.property_filter_ranges = {}
+        self.property_filter_ranges[property_key] = (min_val, max_val)
+        self.update()
+
+    def set_gradient_colors(self, property_key, start_color, end_color):
+        """Set custom gradient colors for visual property encoding.
+
+        Args:
+            property_key: Visual element key to set gradient for
+            start_color: Start color of the gradient (hex string or QColor)
+            end_color: End color of the gradient (hex string or QColor)
+        """
+        if not hasattr(self, 'gradient_colors'):
+            self.gradient_colors = {}
+        self.gradient_colors[property_key] = (start_color, end_color)
+        self.update()
+
+    def set_fade_value(self, property_key, fade):
+        """Set fade value for items outside the filter range.
+
+        Args:
+            property_key: Visual element key to set fade for
+            fade: Fade value from 0.0 (no fade) to 1.0 (fully faded)
+        """
+        if not hasattr(self, 'fade_values'):
+            self.fade_values = {}
+        self.fade_values[property_key] = fade
+        self.update()
+
+    def reload_data(self):
+        """Reload molecule data from files and refresh the display"""
+        self.base_molecules = self.loader.load_all_molecules()
+        self._update_layout()
+        self.update()

@@ -83,8 +83,8 @@ class QuarkInfoPanel(QWidget):
             </p>
         """)
 
-    def update_particle(self, particle):
-        """Update panel with particle data"""
+    def update_quark(self, particle):
+        """Update panel with quark/particle data"""
         if not particle:
             self.show_default()
             return

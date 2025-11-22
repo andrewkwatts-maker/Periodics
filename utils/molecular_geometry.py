@@ -17,9 +17,10 @@ BOND_LENGTHS = {
     ('C', 'H', 'single'): 1.09,
     ('C', 'C', 'single'): 1.54,
     ('C', 'C', 'double'): 1.34,
+    ('C', 'C', 'aromatic'): 1.40,  # Benzene C-C: experimental 1.395Å
     ('C', 'C', 'triple'): 1.20,
     ('C', 'O', 'single'): 1.43,
-    ('C', 'O', 'double'): 1.23,
+    ('C', 'O', 'double'): 1.16,  # CO2 experimental: 1.16Å
     ('C', 'N', 'single'): 1.47,
     ('C', 'N', 'double'): 1.27,
     ('C', 'N', 'triple'): 1.16,

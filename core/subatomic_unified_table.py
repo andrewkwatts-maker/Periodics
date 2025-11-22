@@ -42,6 +42,8 @@ class SubatomicUnifiedTable(QWidget):
         self.border_property = SubatomicProperty.CHARGE
         self.size_property = SubatomicProperty.MASS
         self.glow_property = SubatomicProperty.STABILITY
+        self.ring_property = SubatomicProperty.BARYON_NUMBER
+        self.symbol_text_property = SubatomicProperty.ISOSPIN
 
         # Filters
         self.show_baryons = True
@@ -803,20 +805,28 @@ class SubatomicUnifiedTable(QWidget):
             self.pan_start_y = event.position().y()
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
         elif event.button() == Qt.MouseButton.LeftButton:
-            particle = self._get_particle_at_position(event.position().x(), event.position().y())
-            if particle:
-                self.selected_particle = particle
-                self.particle_selected.emit(particle)
-                # Copy particle data to clipboard
-                clipboard_text = json.dumps(self.selected_particle, indent=2, default=str)
-                QGuiApplication.clipboard().setText(clipboard_text)
-                self.update()
+            # Check for Ctrl+left click for panning
+            if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+                self.is_panning = True
+                self.pan_start_x = event.position().x()
+                self.pan_start_y = event.position().y()
+                self.setCursor(Qt.CursorShape.ClosedHandCursor)
+            else:
+                particle = self._get_particle_at_position(event.position().x(), event.position().y())
+                if particle:
+                    self.selected_particle = particle
+                    self.particle_selected.emit(particle)
+                    # Copy particle data to clipboard
+                    clipboard_text = json.dumps(self.selected_particle, indent=2, default=str)
+                    QGuiApplication.clipboard().setText(clipboard_text)
+                    self.update()
 
     def mouseReleaseEvent(self, event):
         """Handle mouse release"""
-        if event.button() == Qt.MouseButton.MiddleButton:
-            self.is_panning = False
-            self.setCursor(Qt.CursorShape.ArrowCursor)
+        if event.button() == Qt.MouseButton.MiddleButton or event.button() == Qt.MouseButton.LeftButton:
+            if self.is_panning:
+                self.is_panning = False
+                self.setCursor(Qt.CursorShape.ArrowCursor)
 
     def mouseMoveEvent(self, event):
         """Handle mouse move"""
@@ -875,4 +885,19 @@ class SubatomicUnifiedTable(QWidget):
         self.zoom_level = 1.0
         self.pan_x = 0
         self.pan_y = 0
+        self.update()
+
+    def set_zoom(self, zoom_level):
+        """Set zoom level from external control (e.g., slider)
+
+        Args:
+            zoom_level: Zoom factor (0.2 to 5.0, where 1.0 is default)
+        """
+        self.zoom_level = max(0.2, min(5.0, zoom_level))
+        self.update()
+
+    def reload_data(self):
+        """Reload particle data from files and refresh the display"""
+        self.particles = self.loader.get_all_particles()
+        self._needs_layout_update = True
         self.update()
