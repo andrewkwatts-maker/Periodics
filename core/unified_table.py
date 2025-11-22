@@ -4507,3 +4507,6 @@ class UnifiedTable(QWidget):
         elif self.layout_mode == PTLayoutMode.LINEAR:
             self.create_linear_layout()
 
+
+# Alias for backward compatibility
+UnifiedPeriodicTable = UnifiedTable

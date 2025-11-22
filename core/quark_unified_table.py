@@ -75,9 +75,10 @@ class QuarkUnifiedTable(QWidget):
         self.pan_start_x = 0
         self.pan_start_y = 0
 
-        # Load data
-        self.load_particle_data()
+        # Create renderers first (needed by _update_layout)
         self._create_renderers()
+        # Then load data
+        self.load_particle_data()
 
     def load_particle_data(self):
         """Load particle data from JSON files"""

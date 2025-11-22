@@ -7,6 +7,24 @@ from utils.physics_calculator import (
     MoleculeCalculator
 )
 
+# Simulation schema for data-driven physics
+from utils.simulation_schema import (
+    # Enums
+    ParticleType, SpinType, LatticeType,
+    # Constants
+    SimulationConstants,
+    # Base dataclasses
+    Position3D, Momentum3D, QuantumState, FormFactors,
+    # Particle dataclasses
+    QuarkSimulationData, HadronSimulationData, AtomSimulationData,
+    MoleculeSimulationData, AlloySimulationData,
+    # Propagation functions
+    propagate_quark_to_hadron, propagate_hadrons_to_atom,
+    propagate_atoms_to_molecule, propagate_elements_to_alloy,
+    # Utility converters
+    dict_to_quark, dict_to_atom,
+)
+
 # SDFRenderer requires PySide6, import conditionally
 try:
     from utils.sdf_renderer import SDFRenderer
@@ -56,4 +74,13 @@ __all__ = [
     'generate_nucleon_positions',
     'generate_shell_positions',
     'lerp', 'clamp', 'smoothstep', 'distance',
+    # Simulation schema exports
+    'ParticleType', 'SpinType', 'LatticeType',
+    'SimulationConstants',
+    'Position3D', 'Momentum3D', 'QuantumState', 'FormFactors',
+    'QuarkSimulationData', 'HadronSimulationData', 'AtomSimulationData',
+    'MoleculeSimulationData', 'AlloySimulationData',
+    'propagate_quark_to_hadron', 'propagate_hadrons_to_atom',
+    'propagate_atoms_to_molecule', 'propagate_elements_to_alloy',
+    'dict_to_quark', 'dict_to_atom',
 ]
