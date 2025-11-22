@@ -4,10 +4,11 @@ QuarkUnifiedTable - Main visualization widget for particles
 Handles all layout modes and user interactions for the Quarks tab.
 """
 
+import json
 import math
 from PySide6.QtWidgets import QWidget
 from PySide6.QtCore import Qt, QPointF, Signal
-from PySide6.QtGui import (QPainter, QColor, QPen, QBrush, QFont)
+from PySide6.QtGui import (QPainter, QColor, QPen, QBrush, QFont, QGuiApplication)
 
 from core.quark_enums import QuarkLayoutMode, QuarkProperty, ParticleType
 from data.quark_loader import QuarkDataLoader
@@ -282,6 +283,9 @@ class QuarkUnifiedTable(QWidget):
             if self.hovered_particle:
                 self.selected_particle = self.hovered_particle
                 self.particle_selected.emit(self.selected_particle)
+                # Copy particle data to clipboard
+                clipboard_text = json.dumps(self.selected_particle, indent=2, default=str)
+                QGuiApplication.clipboard().setText(clipboard_text)
                 self.update()
 
     def mouseReleaseEvent(self, event):

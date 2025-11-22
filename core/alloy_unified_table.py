@@ -4,11 +4,12 @@ Main visualization widget for displaying alloys with various layouts.
 Features microstructure visualization using crystalline_math module.
 """
 
+import json
 import math
 from PySide6.QtWidgets import QWidget, QScrollArea, QVBoxLayout
 from PySide6.QtCore import Qt, Signal, QPointF, QRectF
 from PySide6.QtGui import (QPainter, QColor, QBrush, QPen, QFont, QRadialGradient,
-                           QLinearGradient, QPainterPath, QImage, QPixmap)
+                           QLinearGradient, QPainterPath, QImage, QPixmap, QGuiApplication)
 
 from data.alloy_loader import AlloyDataLoader
 from core.alloy_enums import (AlloyLayoutMode, AlloyCategory, CrystalStructure,
@@ -483,6 +484,9 @@ class AlloyUnifiedTable(QWidget):
             if self.hovered_alloy:
                 self.selected_alloy = self.hovered_alloy
                 self.alloy_selected.emit(self.selected_alloy)
+                # Copy alloy data to clipboard
+                clipboard_text = json.dumps(self.selected_alloy, indent=2, default=str)
+                QGuiApplication.clipboard().setText(clipboard_text)
                 self.update()
 
     def wheelEvent(self, event):

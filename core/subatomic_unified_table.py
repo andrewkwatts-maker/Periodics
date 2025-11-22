@@ -3,11 +3,12 @@ SubatomicUnifiedTable - Main visualization widget for subatomic particles
 Handles all layout modes and user interactions for the Subatomic tab
 """
 
+import json
 import math
 from PySide6.QtWidgets import QWidget
 from PySide6.QtCore import Qt, QPointF, QRectF, Signal
 from PySide6.QtGui import (QPainter, QColor, QPen, QBrush, QFont, QPainterPath,
-                           QLinearGradient, QRadialGradient, QPolygonF)
+                           QLinearGradient, QRadialGradient, QPolygonF, QGuiApplication)
 
 from data.subatomic_loader import get_subatomic_loader, SubatomicDataLoader
 from core.subatomic_enums import (SubatomicLayoutMode, ParticleCategory, SubatomicProperty,
@@ -794,6 +795,9 @@ class SubatomicUnifiedTable(QWidget):
             if particle:
                 self.selected_particle = particle
                 self.particle_selected.emit(particle)
+                # Copy particle data to clipboard
+                clipboard_text = json.dumps(self.selected_particle, indent=2, default=str)
+                QGuiApplication.clipboard().setText(clipboard_text)
                 self.update()
 
     def mouseReleaseEvent(self, event):

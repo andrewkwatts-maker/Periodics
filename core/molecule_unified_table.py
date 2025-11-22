@@ -3,11 +3,12 @@ Molecule Unified Table Widget
 Main visualization widget for displaying molecules with various layouts.
 """
 
+import json
 import math
 from PySide6.QtWidgets import QWidget, QScrollArea, QVBoxLayout
 from PySide6.QtCore import Qt, Signal, QPointF, QRectF
 from PySide6.QtGui import (QPainter, QColor, QBrush, QPen, QFont, QRadialGradient,
-                           QLinearGradient, QPainterPath)
+                           QLinearGradient, QPainterPath, QGuiApplication)
 
 from data.molecule_loader import MoleculeDataLoader
 from core.molecule_enums import (MoleculeLayoutMode, MolecularGeometry, BondType,
@@ -411,6 +412,9 @@ class MoleculeUnifiedTable(QWidget):
             if self.hovered_molecule:
                 self.selected_molecule = self.hovered_molecule
                 self.molecule_selected.emit(self.selected_molecule)
+                # Copy molecule data to clipboard
+                clipboard_text = json.dumps(self.selected_molecule, indent=2, default=str)
+                QGuiApplication.clipboard().setText(clipboard_text)
                 self.update()
 
     def wheelEvent(self, event):
