@@ -18,13 +18,12 @@ from PySide6.QtCore import Qt, QPointF, QRectF, QTimer
 from PySide6.QtGui import (QPainter, QColor, QPen, QBrush, QFont, QPainterPath,
                            QLinearGradient, QRadialGradient, QPolygonF)
 
-# Import element data and helper functions
-from data.element_data import (IE_DATA, ELECTRONEGATIVITY, ATOMIC_RADIUS, MELTING_POINT,
-                                BOILING_POINT, DENSITY, ELECTRON_AFFINITY, ISOTOPES, BLOCKS,
-                                PERIODS, PRIMARY_EMISSION_WAVELENGTH, VISIBLE_EMISSION_WAVELENGTH,
-                                get_electron_config, get_valence_electrons, get_block,
-                                get_period, get_atomic_number, get_electron_shell_distribution,
-                                get_electron_quantum_numbers)
+# Import element data loader (JSON-based)
+from data.element_loader import get_loader, ElementDataLoader
+
+# Import helper functions that are still needed from element_data
+from data.element_data import (get_electron_config, get_valence_electrons,
+                                get_electron_shell_distribution, get_electron_quantum_numbers)
 
 # Import enums
 from core.pt_enums import (PTPropertyName, PTEncodingKey, PTWavelengthMode, PTElementDataKey,
@@ -300,46 +299,55 @@ class UnifiedTable(QWidget):
         pass
 
     def create_element_data(self):
-        """Create base element data"""
-        # Import element names from constants
-        from constants import ELEMENT_NAMES
+        """Create base element data from JSON files"""
+        # Get the element data loader (loads from JSON files)
+        loader = get_loader()
 
         self.base_elements = []
-        for period_idx, period in enumerate(PERIODS):
-            for elem_idx, symbol in enumerate(period):
-                if symbol not in IE_DATA:
-                    continue
+        for element in loader.get_all_elements():
+            symbol = element['symbol']
+            z = element['atomic_number']
+            ie = element.get('ionization_energy', 10.0)
+            block = element.get('block', 's')
+            electroneg = element.get('electronegativity', 0.0) or 0.0
+            radius = element.get('atomic_radius', 100)
+            melting = element.get('melting_point', 300) or 300
+            # Convert isotopes from JSON dict format to tuple format (mass, abundance)
+            raw_isotopes = element.get('isotopes', [])
+            isotopes = []
+            for iso in raw_isotopes:
+                if isinstance(iso, dict):
+                    mass = iso.get('mass_number', 0)
+                    abundance = iso.get('abundance', 0)
+                    isotopes.append((mass, abundance))
+                elif isinstance(iso, (list, tuple)) and len(iso) >= 2:
+                    isotopes.append((iso[0], iso[1]))
+            density = element.get('density', 1.0) or 1.0
+            boiling = element.get('boiling_point', 300) or 300
+            electron_affinity = element.get('electron_affinity', 0) or 0
+            valence = element.get('valence_electrons') or get_valence_electrons(z, block)
+            name = element.get('name', symbol)
+            group = element.get('group')
+            period = element.get('period', 1)
 
-                z = sum(len(p) for p in PERIODS[:period_idx]) + elem_idx + 1
-                ie = IE_DATA[symbol]
-                block = get_block(symbol)
-                electroneg = ELECTRONEGATIVITY.get(symbol, 0.0)
-                radius = ATOMIC_RADIUS.get(symbol, 100)
-                melting = MELTING_POINT.get(symbol, 300)
-                isotopes = ISOTOPES.get(symbol, [])
-                density = DENSITY.get(symbol, 1.0)
-                boiling = BOILING_POINT.get(symbol, 300)
-                electron_affinity = ELECTRON_AFFINITY.get(symbol, 0)
-                valence = get_valence_electrons(z, block)
+            # Calculate emission spectrum lines for this element
+            # Use configurable max_n for spectrum detail level
+            spectrum_lines = calculate_emission_spectrum(z, ie, max_n=self.spectrum_max_n)
 
-                # Calculate emission spectrum lines for this element
-                # Use configurable max_n for spectrum detail level
-                spectrum_lines = calculate_emission_spectrum(z, ie, max_n=self.spectrum_max_n)
-
-                # Extract wavelengths from calculated spectrum_lines
-                # Primary emission: strongest line overall (from dictionary or strongest calculated line)
-                if symbol in PRIMARY_EMISSION_WAVELENGTH:
-                    primary_wavelength = PRIMARY_EMISSION_WAVELENGTH[symbol]
-                elif spectrum_lines:
+            # Extract wavelengths from calculated spectrum_lines
+            # Primary emission: from JSON or calculated
+            primary_wavelength = element.get('primary_emission_wavelength')
+            if primary_wavelength is None:
+                if spectrum_lines:
                     # Use strongest calculated line
                     primary_wavelength = max(spectrum_lines, key=lambda x: x[1])[0]
                 else:
                     primary_wavelength = ev_to_wavelength(ie)
 
-                # Visible emission: strongest line in visible range (380-780nm)
-                if symbol in VISIBLE_EMISSION_WAVELENGTH:
-                    visible_wavelength = VISIBLE_EMISSION_WAVELENGTH[symbol]
-                elif spectrum_lines:
+            # Visible emission: from JSON or calculated
+            visible_wavelength = element.get('visible_emission_wavelength')
+            if visible_wavelength is None:
+                if spectrum_lines:
                     # Find strongest line in visible range from calculated spectrum
                     visible_lines = [(wl, intensity) for wl, intensity in spectrum_lines if 380 <= wl <= 780]
                     if visible_lines:
@@ -349,51 +357,38 @@ class UnifiedTable(QWidget):
                 else:
                     visible_wavelength = primary_wavelength
 
-                # Ionization wavelength: wavelength corresponding to ionization energy
-                ionization_wavelength = ev_to_wavelength(ie)
+            # Ionization wavelength: wavelength corresponding to ionization energy
+            ionization_wavelength = ev_to_wavelength(ie)
 
-                # Get element name and group from position
-                name = ELEMENT_NAMES.get(symbol, symbol)
-                group = None  # Will be set based on block and period
-
-                # Calculate group number from block and position
-                if block == 's':
-                    group = elem_idx + 1 if period_idx < 2 else elem_idx + 1
-                elif block == 'p':
-                    group = 13 + elem_idx
-                elif block == 'd':
-                    group = 3 + elem_idx
-                # f-block doesn't have group numbers
-
-                self.base_elements.append({
-                    'symbol': symbol,
-                    'name': name,
-                    'z': z,
-                    'ie': ie,
-                    'ionization_energy': ie,  # Alias for tests
-                    'block': block,
-                    'block_color': get_block_color(block),
-                    'period': period_idx + 1,
-                    'group': group,
-                    'freq_phz': ev_to_frequency(ie),
-                    'wavelength_nm': primary_wavelength,  # Primary emission wavelength
-                    'emission_wavelength': primary_wavelength,  # Strongest emission line (may be UV/IR)
-                    'visible_emission_wavelength': visible_wavelength,  # Most prominent visible line
-                    'ionization_wavelength': ionization_wavelength,  # Wavelength from IE
-                    'electronegativity': electroneg,
-                    'atomic_radius': radius,
-                    'melting_point': melting,
-                    'melting': melting,  # Alias for tests
-                    'boiling_point': boiling,
-                    'boiling': boiling,  # Alias for tests
-                    'density': density,
-                    'electron_affinity': electron_affinity,
-                    'valence_electrons': valence,
-                    'valence': valence,  # Alias for tests
-                    'electron_config': get_electron_config(z),
-                    'isotopes': isotopes,
-                    'spectrum_lines': spectrum_lines
-                })
+            self.base_elements.append({
+                'symbol': symbol,
+                'name': name,
+                'z': z,
+                'ie': ie,
+                'ionization_energy': ie,  # Alias for tests
+                'block': block,
+                'block_color': get_block_color(block),
+                'period': period,
+                'group': group,
+                'freq_phz': ev_to_frequency(ie),
+                'wavelength_nm': primary_wavelength,  # Primary emission wavelength
+                'emission_wavelength': primary_wavelength,  # Strongest emission line (may be UV/IR)
+                'visible_emission_wavelength': visible_wavelength,  # Most prominent visible line
+                'ionization_wavelength': ionization_wavelength,  # Wavelength from IE
+                'electronegativity': electroneg,
+                'atomic_radius': radius,
+                'melting_point': melting,
+                'melting': melting,  # Alias for tests
+                'boiling_point': boiling,
+                'boiling': boiling,  # Alias for tests
+                'density': density,
+                'electron_affinity': electron_affinity,
+                'valence_electrons': valence,
+                'valence': valence,  # Alias for tests
+                'electron_config': element.get('electron_configuration') or get_electron_config(z),
+                'isotopes': isotopes,
+                'spectrum_lines': spectrum_lines
+            })
 
         # Select hydrogen (Z=1) by default on launch
         if self.base_elements:
@@ -455,7 +450,7 @@ class UnifiedTable(QWidget):
         symbol = elem.get('symbol', '')
         z = elem.get('z', 0)
 
-        isotopes = ISOTOPES.get(symbol, [])
+        isotopes = elem.get('isotopes', [])
         if not isotopes:
             # No isotope data - assume N = Z
             return neutron_offset == 0
@@ -561,7 +556,7 @@ class UnifiedTable(QWidget):
             y = spiral_center_y + base_radius_elem * math.sin(spiral_angle)
 
             # Get isotopes for this element
-            isotopes = ISOTOPES.get(elem['symbol'], [])
+            isotopes = elem.get('isotopes', [])
             if not isotopes:
                 isotopes = [(elem['z'] * 2, 100)]
 
@@ -1506,7 +1501,7 @@ class UnifiedTable(QWidget):
 
         # Isotope visualization (if enabled)
         if self.show_isotopes:
-            isotopes = ISOTOPES.get(elem['symbol'], [])
+            isotopes = elem.get('isotopes', [])
             if isotopes:
                 # Draw isotope markers as small circles along the arc
                 num_isotopes = len(isotopes)
@@ -2184,7 +2179,7 @@ class UnifiedTable(QWidget):
 
         # Draw isotopes if enabled
         if self.show_isotopes and passes_filter:
-            isotopes = ISOTOPES.get(elem['symbol'], [])
+            isotopes = elem.get('isotopes', [])
             if isotopes:
                 iso_y_offset = 15
                 for iso_idx, (mass, abundance) in enumerate(isotopes[:3]):  # Limit to 3 isotopes
@@ -2519,7 +2514,7 @@ class UnifiedTable(QWidget):
             if not elem.get('has_element'):
                 continue
 
-            isotopes = ISOTOPES.get(elem['symbol'], [])
+            isotopes = elem.get('isotopes', [])
             if not isotopes:
                 continue
 
@@ -4089,11 +4084,11 @@ class UnifiedTable(QWidget):
         symbol = self.selected_element.get('symbol', '')
 
         # Get isotope information for neutron count
-        isotopes = ISOTOPES.get(symbol, [])
+        isotopes = self.selected_element.get('isotopes', [])
         if isotopes:
-            # Use most abundant isotope
+            # Use most abundant isotope (isotopes are now in tuple format: (mass, abundance))
             most_abundant = max(isotopes, key=lambda iso: iso[1] if isinstance(iso, tuple) else iso.get('abundance', 0))
-            mass = most_abundant[0] if isinstance(most_abundant, tuple) else most_abundant.get('mass', z * 2)
+            mass = most_abundant[0] if isinstance(most_abundant, tuple) else most_abundant.get('mass_number', z * 2)
         else:
             # Estimate mass number
             mass = z * 2
