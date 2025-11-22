@@ -12,7 +12,9 @@ from PySide6.QtGui import QFont, QPainter, QColor, QBrush, QPen, QRadialGradient
 
 from core.molecule_enums import (MolecularGeometry, BondType, MoleculePolarity,
                                   MoleculeCategory, MoleculeState, get_element_color)
-from data.data_manager import DataCategory
+from data.data_manager import DataCategory, get_data_manager
+import json
+from pathlib import Path
 
 
 def rotate_point_3d(x, y, z, pitch, yaw, roll):
@@ -54,6 +56,23 @@ def rotate_point_3d(x, y, z, pitch, yaw, roll):
 class MoleculeStructureWidget(QFrame):
     """Widget to display molecular structure diagram with 3D rotation support"""
 
+    # Default geometry configurations (fallbacks when JSON data not available)
+    DEFAULT_GEOMETRY_CONFIG = {
+        'Bent': {'default_angle': 104.5},
+        'Tetrahedral': {'default_angle': 109.47},
+        'Trigonal Pyramidal': {'default_angle': 107.0},
+        'Trigonal Planar': {'default_angle': 120.0},
+        'Linear': {'default_angle': 180.0},
+        'Octahedral': {'default_angle': 90.0},
+        'Square Planar': {'default_angle': 90.0},
+    }
+
+    # Default element radii for display (in pixels) - fallback values
+    DEFAULT_ELEMENT_RADII = {
+        'H': 15, 'C': 22, 'N': 20, 'O': 18, 'S': 24, 'P': 23,
+        'Cl': 22, 'Br': 25, 'F': 16, 'I': 28, 'Na': 26, 'K': 28
+    }
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.molecule = None
@@ -70,6 +89,10 @@ class MoleculeStructureWidget(QFrame):
         self.yaw = 0.0
         self.roll = 0.0
 
+        # Cache for layout config and element data
+        self._layout_config = None
+        self._element_radii_cache = {}
+
     def set_molecule(self, mol):
         """Set molecule to display"""
         self.molecule = mol
@@ -81,6 +104,97 @@ class MoleculeStructureWidget(QFrame):
         self.yaw = yaw
         self.roll = roll
         self.update()
+
+    def _get_layout_config(self):
+        """Load and cache the layout configuration from layout_config.json"""
+        if self._layout_config is None:
+            try:
+                config_path = Path(__file__).parent.parent / "data" / "layout_config" / "layout_config.json"
+                if config_path.exists():
+                    with open(config_path, 'r', encoding='utf-8') as f:
+                        self._layout_config = json.load(f)
+                else:
+                    self._layout_config = {}
+            except Exception as e:
+                print(f"Error loading layout config: {e}")
+                self._layout_config = {}
+        return self._layout_config
+
+    def _get_geometry_defaults(self, geometry):
+        """Get default configuration for a specific geometry type"""
+        # First check layout_config
+        config = self._get_layout_config()
+        molecules_config = config.get('molecules', {})
+
+        # Check if there are geometry-specific defaults in config
+        geometry_defaults = molecules_config.get('geometry_defaults', {}).get(geometry, {})
+
+        # Merge with class defaults
+        defaults = self.DEFAULT_GEOMETRY_CONFIG.get(geometry, {'default_angle': 109.5})
+        defaults.update(geometry_defaults)
+
+        return defaults
+
+    def _get_element_radius_from_data(self, element):
+        """
+        Get the atomic radius for an element from element JSON data.
+        Uses covalent_radius scaled to display pixels.
+        """
+        if element in self._element_radii_cache:
+            return self._element_radii_cache[element]
+
+        try:
+            data_manager = get_data_manager()
+            element_data = data_manager.get_item(DataCategory.ELEMENTS, element)
+
+            if element_data:
+                # Use covalent_radius (in pm) scaled for display
+                # Typical covalent radii: H=31, C=76, O=66, N=71
+                # Scale factor to convert pm to reasonable pixel size
+                covalent_radius = element_data.get('covalent_radius', 0)
+                atomic_radius = element_data.get('atomic_radius', 0)
+
+                if covalent_radius > 0:
+                    # Scale covalent radius (typically 30-150 pm) to pixel range (15-30)
+                    display_radius = max(12, min(30, covalent_radius * 0.25))
+                    self._element_radii_cache[element] = display_radius
+                    return display_radius
+                elif atomic_radius > 0:
+                    display_radius = max(12, min(30, atomic_radius * 0.3))
+                    self._element_radii_cache[element] = display_radius
+                    return display_radius
+        except Exception as e:
+            pass  # Fall back to defaults
+
+        # Fall back to default
+        default_radius = self.DEFAULT_ELEMENT_RADII.get(element, 20)
+        self._element_radii_cache[element] = default_radius
+        return default_radius
+
+    def _get_bond_length_scale(self, molecule, radius):
+        """
+        Calculate a scale factor for bond lengths based on molecule's bond data.
+        Returns a multiplier to convert bond lengths to display coordinates.
+        """
+        bonds = molecule.get('Bonds', [])
+        if not bonds:
+            return radius * 0.7 / 100  # Default scale
+
+        # Get average bond length in pm
+        total_length = 0
+        count = 0
+        for bond in bonds:
+            length = bond.get('Length_pm', 0)
+            if length > 0:
+                total_length += length
+                count += 1
+
+        if count > 0:
+            avg_length_pm = total_length / count
+            # Scale so average bond appears at about 0.7 * radius
+            return (radius * 0.7) / avg_length_pm
+
+        return radius * 0.7 / 100  # Default scale
 
     def paintEvent(self, event):
         """Paint the molecular structure"""
@@ -125,179 +239,369 @@ class MoleculeStructureWidget(QFrame):
         painter.end()
 
     def _calculate_atom_positions(self, composition, geometry, cx, cy, radius):
-        """Calculate atom positions based on geometry with 3D rotation support"""
+        """
+        Calculate atom positions based on geometry with 3D rotation support.
+
+        Priority for position data:
+        1. Use Atoms3D from molecule JSON if available (most accurate)
+        2. Calculate using BondAngle_deg from molecule JSON
+        3. Fall back to default geometry angles
+        """
         positions_3d = []
         total_atoms = sum(c.get('Count', 1) for c in composition)
 
         if total_atoms == 0:
             return []
 
-        # Generate initial 3D positions based on geometry
+        # Try to use Atoms3D data from molecule JSON (most accurate)
+        if self.molecule and 'Atoms3D' in self.molecule:
+            positions_3d = self._positions_from_atoms3d(radius)
+            if positions_3d:
+                return self._apply_rotation_and_project(positions_3d, cx, cy, radius)
+
+        # Get bond angle from molecule data or use defaults
+        bond_angle_deg = self._get_bond_angle(geometry)
+        bond_length_scale = self._get_bond_length_scale(self.molecule, radius) if self.molecule else radius * 0.7 / 100
+
+        # Generate initial 3D positions based on geometry using JSON data
         if geometry == 'Linear':
-            # Horizontal line along X-axis
-            step = radius * 1.5 / max(total_atoms - 1, 1) if total_atoms > 1 else 0
-            start_x = -(total_atoms - 1) * step / 2
-            atom_idx = 0
-            for comp in composition:
-                element = comp.get('Element', '?')
-                count = comp.get('Count', 1)
-                for i in range(count):
-                    positions_3d.append({
-                        'element': element,
-                        'x': start_x + atom_idx * step,
-                        'y': 0,
-                        'z': 0,
-                        'radius': self._get_atom_radius(element)
-                    })
-                    atom_idx += 1
+            positions_3d = self._generate_linear_positions(composition, radius)
 
         elif geometry == 'Bent':
-            # V-shape in XY plane with Z variation
-            angle = math.radians(104.5)
-            central_atom = composition[0] if composition else {'Element': '?'}
-            positions_3d.append({
-                'element': central_atom.get('Element', '?'),
-                'x': 0, 'y': 0, 'z': 0,
-                'radius': self._get_atom_radius(central_atom.get('Element', '?'))
-            })
-            if len(composition) > 1:
-                peripheral = composition[1]
-                count = peripheral.get('Count', 1)
-                for i in range(count):
-                    a = -math.pi/2 + (i - (count-1)/2) * angle / max(count-1, 1)
-                    positions_3d.append({
-                        'element': peripheral.get('Element', '?'),
-                        'x': radius * 0.7 * math.cos(a),
-                        'y': radius * 0.7 * math.sin(a),
-                        'z': radius * 0.1 * (i - (count-1)/2),  # Slight Z offset
-                        'radius': self._get_atom_radius(peripheral.get('Element', '?'))
-                    })
+            positions_3d = self._generate_bent_positions(composition, radius, bond_angle_deg)
 
         elif geometry == 'Tetrahedral':
-            # True tetrahedral 3D arrangement
-            central = composition[0] if composition else {'Element': '?'}
-            positions_3d.append({
-                'element': central.get('Element', '?'),
-                'x': 0, 'y': 0, 'z': 0,
-                'radius': self._get_atom_radius(central.get('Element', '?'))
-            })
-            # Tetrahedral angles
-            tet_angle = math.acos(-1/3)  # ~109.47 degrees
-            atom_idx = 0
-            for comp in composition[1:] if len(composition) > 1 else []:
-                element = comp.get('Element', '?')
-                count = comp.get('Count', 1)
-                for i in range(count):
-                    if atom_idx == 0:
-                        x, y, z = 0, 0, radius * 0.65
-                    elif atom_idx == 1:
-                        x = radius * 0.65 * math.sin(tet_angle)
-                        y = 0
-                        z = -radius * 0.65 * math.cos(tet_angle)
-                    elif atom_idx == 2:
-                        x = -radius * 0.65 * math.sin(tet_angle) * math.cos(math.pi/3)
-                        y = radius * 0.65 * math.sin(tet_angle) * math.sin(math.pi/3)
-                        z = -radius * 0.65 * math.cos(tet_angle)
-                    else:
-                        x = -radius * 0.65 * math.sin(tet_angle) * math.cos(math.pi/3)
-                        y = -radius * 0.65 * math.sin(tet_angle) * math.sin(math.pi/3)
-                        z = -radius * 0.65 * math.cos(tet_angle)
-                    positions_3d.append({
-                        'element': element,
-                        'x': x, 'y': y, 'z': z,
-                        'radius': self._get_atom_radius(element)
-                    })
-                    atom_idx += 1
+            positions_3d = self._generate_tetrahedral_positions(composition, radius, bond_angle_deg)
 
         elif geometry == 'Trigonal Pyramidal':
-            # Pyramidal 3D arrangement
-            central = composition[0] if composition else {'Element': '?'}
-            positions_3d.append({
-                'element': central.get('Element', '?'),
-                'x': 0, 'y': 0, 'z': radius * 0.2,
-                'radius': self._get_atom_radius(central.get('Element', '?'))
-            })
-            atom_idx = 0
-            for comp in composition[1:] if len(composition) > 1 else []:
-                element = comp.get('Element', '?')
-                count = comp.get('Count', 1)
-                for i in range(count):
-                    a = atom_idx * 2 * math.pi / 3 - math.pi/2
-                    positions_3d.append({
-                        'element': element,
-                        'x': radius * 0.55 * math.cos(a),
-                        'y': radius * 0.55 * math.sin(a),
-                        'z': -radius * 0.3,
-                        'radius': self._get_atom_radius(element)
-                    })
-                    atom_idx += 1
+            positions_3d = self._generate_trigonal_pyramidal_positions(composition, radius, bond_angle_deg)
 
         elif geometry == 'Trigonal Planar':
-            # Triangle arrangement in XY plane
-            central = composition[0] if composition else {'Element': '?'}
-            positions_3d.append({
-                'element': central.get('Element', '?'),
-                'x': 0, 'y': 0, 'z': 0,
-                'radius': self._get_atom_radius(central.get('Element', '?'))
-            })
-            atom_idx = 0
-            for comp in composition[1:] if len(composition) > 1 else []:
-                count = comp.get('Count', 1)
-                for j in range(count):
-                    a = atom_idx * 2 * math.pi / 3 - math.pi/2
-                    positions_3d.append({
-                        'element': comp.get('Element', '?'),
-                        'x': radius * 0.6 * math.cos(a),
-                        'y': radius * 0.6 * math.sin(a),
-                        'z': 0,
-                        'radius': self._get_atom_radius(comp.get('Element', '?'))
-                    })
-                    atom_idx += 1
+            positions_3d = self._generate_trigonal_planar_positions(composition, radius, bond_angle_deg)
 
         elif geometry == 'Planar Hexagonal':
-            # Hexagon in XY plane (like benzene)
-            atom_idx = 0
-            for comp in composition:
-                element = comp.get('Element', '?')
-                count = comp.get('Count', 1)
-                for i in range(count):
-                    a = atom_idx * math.pi / 3 - math.pi/2
-                    r = radius * 0.6 if element == 'C' else radius * 0.85
-                    positions_3d.append({
-                        'element': element,
-                        'x': r * math.cos(a),
-                        'y': r * math.sin(a),
-                        'z': 0,
-                        'radius': self._get_atom_radius(element)
-                    })
-                    atom_idx += 1
+            positions_3d = self._generate_planar_hexagonal_positions(composition, radius)
 
         else:
-            # Default circular arrangement with slight Z variation
-            atom_idx = 0
-            for comp in composition:
-                element = comp.get('Element', '?')
-                count = comp.get('Count', 1)
-                for i in range(count):
-                    if total_atoms == 1:
-                        positions_3d.append({
-                            'element': element,
-                            'x': 0, 'y': 0, 'z': 0,
-                            'radius': self._get_atom_radius(element)
-                        })
-                    else:
-                        a = atom_idx * 2 * math.pi / total_atoms - math.pi/2
-                        positions_3d.append({
-                            'element': element,
-                            'x': radius * 0.6 * math.cos(a),
-                            'y': radius * 0.6 * math.sin(a),
-                            'z': radius * 0.15 * math.sin(atom_idx * math.pi / 2),
-                            'radius': self._get_atom_radius(element)
-                        })
-                    atom_idx += 1
+            positions_3d = self._generate_default_positions(composition, radius, total_atoms)
 
-        # Apply 3D rotation and project to 2D
+        return self._apply_rotation_and_project(positions_3d, cx, cy, radius)
+
+    def _get_bond_angle(self, geometry):
+        """
+        Get bond angle from molecule JSON data or fall back to defaults.
+        Returns angle in degrees.
+        """
+        # First try to get from molecule's BondAngle_deg field
+        if self.molecule:
+            bond_angle = self.molecule.get('BondAngle_deg')
+            if bond_angle is not None and bond_angle > 0:
+                return bond_angle
+
+        # Fall back to geometry defaults
+        defaults = self._get_geometry_defaults(geometry)
+        return defaults.get('default_angle', 109.5)
+
+    def _positions_from_atoms3d(self, radius):
+        """
+        Generate position data from molecule's Atoms3D field.
+        This provides the most accurate molecular geometry from pre-calculated coordinates.
+        """
+        atoms_3d = self.molecule.get('Atoms3D', [])
+        if not atoms_3d:
+            return []
+
         positions = []
+
+        # Find the bounding box to scale coordinates appropriately
+        xs = [a.get('x', 0) for a in atoms_3d]
+        ys = [a.get('y', 0) for a in atoms_3d]
+        zs = [a.get('z', 0) for a in atoms_3d]
+
+        max_extent = max(
+            max(xs) - min(xs) if xs else 1,
+            max(ys) - min(ys) if ys else 1,
+            max(zs) - min(zs) if zs else 1,
+            0.001  # Avoid division by zero
+        )
+
+        # Scale factor to fit in display radius
+        scale = (radius * 0.7) / max(max_extent, 0.5)
+
+        # Center offset
+        center_x = (max(xs) + min(xs)) / 2 if xs else 0
+        center_y = (max(ys) + min(ys)) / 2 if ys else 0
+        center_z = (max(zs) + min(zs)) / 2 if zs else 0
+
+        for atom in atoms_3d:
+            element = atom.get('element', '?')
+            positions.append({
+                'element': element,
+                'x': (atom.get('x', 0) - center_x) * scale,
+                'y': (atom.get('y', 0) - center_y) * scale,
+                'z': (atom.get('z', 0) - center_z) * scale,
+                'radius': self._get_atom_radius(element)
+            })
+
+        return positions
+
+    def _generate_linear_positions(self, composition, radius):
+        """Generate positions for Linear geometry"""
+        positions = []
+        total_atoms = sum(c.get('Count', 1) for c in composition)
+        step = radius * 1.5 / max(total_atoms - 1, 1) if total_atoms > 1 else 0
+        start_x = -(total_atoms - 1) * step / 2
+        atom_idx = 0
+
+        for comp in composition:
+            element = comp.get('Element', '?')
+            count = comp.get('Count', 1)
+            for i in range(count):
+                positions.append({
+                    'element': element,
+                    'x': start_x + atom_idx * step,
+                    'y': 0,
+                    'z': 0,
+                    'radius': self._get_atom_radius(element)
+                })
+                atom_idx += 1
+
+        return positions
+
+    def _generate_bent_positions(self, composition, radius, bond_angle_deg):
+        """Generate positions for Bent geometry using bond angle from JSON data"""
+        positions = []
+        # Use the actual bond angle from data
+        angle = math.radians(bond_angle_deg)
+
+        central_atom = composition[0] if composition else {'Element': '?'}
+        positions.append({
+            'element': central_atom.get('Element', '?'),
+            'x': 0, 'y': 0, 'z': 0,
+            'radius': self._get_atom_radius(central_atom.get('Element', '?'))
+        })
+
+        if len(composition) > 1:
+            peripheral = composition[1]
+            count = peripheral.get('Count', 1)
+
+            # Get bond length from molecule data if available
+            bond_radius = self._get_display_bond_length(radius)
+
+            for i in range(count):
+                # Position atoms at the actual bond angle
+                a = -math.pi/2 + (i - (count-1)/2) * angle / max(count-1, 1)
+                positions.append({
+                    'element': peripheral.get('Element', '?'),
+                    'x': bond_radius * math.cos(a),
+                    'y': bond_radius * math.sin(a),
+                    'z': radius * 0.1 * (i - (count-1)/2),  # Slight Z offset for depth
+                    'radius': self._get_atom_radius(peripheral.get('Element', '?'))
+                })
+
+        return positions
+
+    def _generate_tetrahedral_positions(self, composition, radius, bond_angle_deg):
+        """Generate positions for Tetrahedral geometry using bond angle from JSON data"""
+        positions = []
+
+        central = composition[0] if composition else {'Element': '?'}
+        positions.append({
+            'element': central.get('Element', '?'),
+            'x': 0, 'y': 0, 'z': 0,
+            'radius': self._get_atom_radius(central.get('Element', '?'))
+        })
+
+        # Use bond angle from data to calculate tetrahedral angle
+        # For ideal tetrahedral, this is 109.47 degrees
+        tet_angle_rad = math.radians(bond_angle_deg)
+        # Calculate the angle from vertical based on bond angle
+        # For tetrahedral: cos(theta) = -1/3, theta = 109.47 degrees between bonds
+        # The angle from the z-axis is: arccos(1/sqrt(3)) for ideal tetrahedral
+        tet_angle = math.acos(math.cos(tet_angle_rad / 2))
+
+        bond_radius = self._get_display_bond_length(radius)
+        atom_idx = 0
+
+        for comp in composition[1:] if len(composition) > 1 else []:
+            element = comp.get('Element', '?')
+            count = comp.get('Count', 1)
+            for i in range(count):
+                if atom_idx == 0:
+                    x, y, z = 0, 0, bond_radius
+                elif atom_idx == 1:
+                    x = bond_radius * math.sin(tet_angle)
+                    y = 0
+                    z = -bond_radius * math.cos(tet_angle)
+                elif atom_idx == 2:
+                    x = -bond_radius * math.sin(tet_angle) * math.cos(math.pi/3)
+                    y = bond_radius * math.sin(tet_angle) * math.sin(math.pi/3)
+                    z = -bond_radius * math.cos(tet_angle)
+                else:
+                    x = -bond_radius * math.sin(tet_angle) * math.cos(math.pi/3)
+                    y = -bond_radius * math.sin(tet_angle) * math.sin(math.pi/3)
+                    z = -bond_radius * math.cos(tet_angle)
+
+                positions.append({
+                    'element': element,
+                    'x': x, 'y': y, 'z': z,
+                    'radius': self._get_atom_radius(element)
+                })
+                atom_idx += 1
+
+        return positions
+
+    def _generate_trigonal_pyramidal_positions(self, composition, radius, bond_angle_deg):
+        """Generate positions for Trigonal Pyramidal geometry using bond angle from JSON data"""
+        positions = []
+
+        # The bond angle determines how "flat" the pyramid is
+        # Smaller angle = more pyramidal, larger angle = flatter
+        angle_rad = math.radians(bond_angle_deg)
+
+        # Calculate z-offset based on bond angle (how far up the central atom is)
+        # For 107 degrees (ammonia), the central atom is above the base plane
+        z_offset = radius * 0.2 * (1 - (bond_angle_deg - 90) / 30)
+
+        central = composition[0] if composition else {'Element': '?'}
+        positions.append({
+            'element': central.get('Element', '?'),
+            'x': 0, 'y': 0, 'z': max(0, z_offset),
+            'radius': self._get_atom_radius(central.get('Element', '?'))
+        })
+
+        bond_radius = self._get_display_bond_length(radius, scale=0.55)
+        atom_idx = 0
+
+        for comp in composition[1:] if len(composition) > 1 else []:
+            element = comp.get('Element', '?')
+            count = comp.get('Count', 1)
+            for i in range(count):
+                a = atom_idx * 2 * math.pi / 3 - math.pi/2
+                positions.append({
+                    'element': element,
+                    'x': bond_radius * math.cos(a),
+                    'y': bond_radius * math.sin(a),
+                    'z': -radius * 0.3,
+                    'radius': self._get_atom_radius(element)
+                })
+                atom_idx += 1
+
+        return positions
+
+    def _generate_trigonal_planar_positions(self, composition, radius, bond_angle_deg):
+        """Generate positions for Trigonal Planar geometry using bond angle from JSON data"""
+        positions = []
+
+        # For trigonal planar, bond angle should be 120 degrees
+        # Use the actual angle from data for any variations
+
+        central = composition[0] if composition else {'Element': '?'}
+        positions.append({
+            'element': central.get('Element', '?'),
+            'x': 0, 'y': 0, 'z': 0,
+            'radius': self._get_atom_radius(central.get('Element', '?'))
+        })
+
+        bond_radius = self._get_display_bond_length(radius, scale=0.6)
+        # Convert bond angle to angular spacing
+        angular_spacing = math.radians(bond_angle_deg)
+        atom_idx = 0
+
+        for comp in composition[1:] if len(composition) > 1 else []:
+            count = comp.get('Count', 1)
+            for j in range(count):
+                a = atom_idx * angular_spacing - math.pi/2
+                positions.append({
+                    'element': comp.get('Element', '?'),
+                    'x': bond_radius * math.cos(a),
+                    'y': bond_radius * math.sin(a),
+                    'z': 0,
+                    'radius': self._get_atom_radius(comp.get('Element', '?'))
+                })
+                atom_idx += 1
+
+        return positions
+
+    def _generate_planar_hexagonal_positions(self, composition, radius):
+        """Generate positions for Planar Hexagonal geometry (like benzene)"""
+        positions = []
+        atom_idx = 0
+
+        for comp in composition:
+            element = comp.get('Element', '?')
+            count = comp.get('Count', 1)
+            for i in range(count):
+                a = atom_idx * math.pi / 3 - math.pi/2
+                r = radius * 0.6 if element == 'C' else radius * 0.85
+                positions.append({
+                    'element': element,
+                    'x': r * math.cos(a),
+                    'y': r * math.sin(a),
+                    'z': 0,
+                    'radius': self._get_atom_radius(element)
+                })
+                atom_idx += 1
+
+        return positions
+
+    def _generate_default_positions(self, composition, radius, total_atoms):
+        """Generate default circular arrangement for unknown geometries"""
+        positions = []
+        atom_idx = 0
+
+        for comp in composition:
+            element = comp.get('Element', '?')
+            count = comp.get('Count', 1)
+            for i in range(count):
+                if total_atoms == 1:
+                    positions.append({
+                        'element': element,
+                        'x': 0, 'y': 0, 'z': 0,
+                        'radius': self._get_atom_radius(element)
+                    })
+                else:
+                    a = atom_idx * 2 * math.pi / total_atoms - math.pi/2
+                    positions.append({
+                        'element': element,
+                        'x': radius * 0.6 * math.cos(a),
+                        'y': radius * 0.6 * math.sin(a),
+                        'z': radius * 0.15 * math.sin(atom_idx * math.pi / 2),
+                        'radius': self._get_atom_radius(element)
+                    })
+                atom_idx += 1
+
+        return positions
+
+    def _get_display_bond_length(self, radius, scale=0.7):
+        """
+        Get display bond length based on molecule's bond data.
+        Uses BondLength_pm from Bonds array if available.
+        """
+        if self.molecule:
+            bonds = self.molecule.get('Bonds', [])
+            if bonds:
+                # Get average bond length
+                total_length = 0
+                count = 0
+                for bond in bonds:
+                    length = bond.get('Length_pm', 0)
+                    if length > 0:
+                        total_length += length
+                        count += 1
+
+                if count > 0:
+                    avg_length = total_length / count
+                    # Scale from pm (typically 90-150) to display coordinates
+                    # Map to radius * scale range
+                    return radius * scale * (avg_length / 100)
+
+        return radius * scale
+
+    def _apply_rotation_and_project(self, positions_3d, cx, cy, radius):
+        """Apply 3D rotation and project to 2D screen coordinates"""
+        positions = []
+
         for atom in positions_3d:
             x_rot, y_rot, z_rot = rotate_point_3d(
                 atom['x'], atom['y'], atom['z'],
@@ -321,12 +625,15 @@ class MoleculeStructureWidget(QFrame):
         return positions
 
     def _get_atom_radius(self, element):
-        """Get display radius for an element"""
-        radii = {
-            'H': 15, 'C': 22, 'N': 20, 'O': 18, 'S': 24, 'P': 23,
-            'Cl': 22, 'Br': 25, 'F': 16, 'I': 28, 'Na': 26, 'K': 28
-        }
-        return radii.get(element, 20)
+        """
+        Get display radius for an element.
+
+        Priority:
+        1. Cached value (from previous lookup)
+        2. Element data from JSON (covalent_radius or atomic_radius)
+        3. Default hardcoded values
+        """
+        return self._get_element_radius_from_data(element)
 
     def _draw_bonds(self, painter, positions, bonds, cx, cy):
         """Draw bonds between atoms"""

@@ -93,7 +93,48 @@
     },
     "particle_type_order": ["Baryon", "Meson"],
     "charge_order": [2, 1, 0, -1, -2],
-    "stability_order": ["Stable", "Long-lived", "Short-lived", "Very short-lived"]
+    "stability_order": ["Stable", "Long-lived", "Short-lived", "Very short-lived"],
+    "quark_diagram": {
+      "quark_size": 35,
+      "quark_size_min": 20,
+      "quark_size_max": 50,
+      "baryon_radius": 30,
+      "meson_spacing": 50,
+      "glow_extra_size": 10,
+      "glow_alpha": 50,
+      "border_width": 2,
+      "label_font_size": 12,
+      "content_font_size": 9,
+      "background_color": [25, 25, 45],
+      "default_text_color": [100, 100, 100],
+      "label_text_color": [150, 150, 150],
+      "arrangements": {
+        "2": {
+          "type": "linear",
+          "spacing_ratio": 1.4
+        },
+        "3": {
+          "type": "triangle",
+          "radius_ratio": 1.0,
+          "top_offset": -1.0,
+          "bottom_offset": 0.6
+        },
+        "4": {
+          "type": "square",
+          "radius_ratio": 1.2
+        },
+        "5": {
+          "type": "pentagon",
+          "radius_ratio": 1.3
+        }
+      }
+    },
+    "card_quark_mini": {
+      "quark_size": 18,
+      "quark_spacing": 22,
+      "border_width": 1,
+      "label_font_size": 9
+    }
   },
 
   "molecules": {
@@ -152,6 +193,41 @@
       "card_size": 60,
       "axis_padding": 60,
       "plot_padding": 80
+    },
+    "composition_pie": {
+      "center_x_ratio": 0.3,
+      "center_y_ratio": 0.55,
+      "radius_ratio": 0.28,
+      "donut_hole_ratio": 0.4,
+      "legend_x_ratio": 0.55,
+      "legend_y_offset": 40,
+      "legend_item_height": 18,
+      "max_legend_items": 6,
+      "min_display_percent": 0.5,
+      "start_angle_deg": 90
+    },
+    "properties_bar": {
+      "margin": 15,
+      "bar_height": 18,
+      "bar_spacing": 8,
+      "label_width_ratio": 0.35,
+      "value_text_width": 50,
+      "title_height": 25,
+      "property_ranges": {
+        "tensile_strength": {"max": 2000, "unit": "MPa", "color": "#4CAF50"},
+        "yield_strength": {"max": 1500, "unit": "MPa", "color": "#2196F3"},
+        "hardness": {"max": 600, "unit": "HB", "color": "#FF9800"},
+        "elongation": {"max": 60, "unit": "%", "color": "#9C27B0"}
+      }
+    },
+    "microstructure": {
+      "margin": 15,
+      "legend_height": 30,
+      "grain_count_range": [10, 50],
+      "grain_size_scale": 0.3,
+      "grain_sides": 6,
+      "default_grain_seed_density": 400,
+      "default_grain_size": 50
     },
     "category_order": [
       "Steel", "Aluminum", "Bronze", "Brass", "Copper",

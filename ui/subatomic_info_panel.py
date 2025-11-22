@@ -3,74 +3,198 @@ Subatomic Info Panel - Particle Information Display
 Shows detailed properties and quark composition for selected particles
 """
 
+import math
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QTextEdit, QFrame, QHBoxLayout, QStackedWidget
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QColor, QPainter, QBrush, QPen
 
 from core.subatomic_enums import QuarkType, PARTICLE_COLORS
 from data.data_manager import DataCategory
+from data.layout_config_loader import get_subatomic_config
 from ui.inline_editor import InlineDataEditor
 
 
 class QuarkDiagram(QWidget):
-    """Widget to display quark composition visually"""
+    """Widget to display quark composition visually using data-driven configuration"""
 
     def __init__(self):
         super().__init__()
         self.particle = None
-        self.setMinimumHeight(100)
-        self.setMaximumHeight(120)
+        self._load_config()
+
+    def _load_config(self):
+        """Load configuration from layout_config.json"""
+        # Get quark diagram configuration with sensible defaults
+        self.quark_size = get_subatomic_config('quark_diagram', 'quark_size', default=35)
+        self.quark_size_min = get_subatomic_config('quark_diagram', 'quark_size_min', default=20)
+        self.quark_size_max = get_subatomic_config('quark_diagram', 'quark_size_max', default=50)
+        self.baryon_radius = get_subatomic_config('quark_diagram', 'baryon_radius', default=30)
+        self.meson_spacing = get_subatomic_config('quark_diagram', 'meson_spacing', default=50)
+        self.glow_extra_size = get_subatomic_config('quark_diagram', 'glow_extra_size', default=10)
+        self.glow_alpha = get_subatomic_config('quark_diagram', 'glow_alpha', default=50)
+        self.border_width = get_subatomic_config('quark_diagram', 'border_width', default=2)
+        self.label_font_size = get_subatomic_config('quark_diagram', 'label_font_size', default=12)
+        self.content_font_size = get_subatomic_config('quark_diagram', 'content_font_size', default=9)
+
+        # Background and text colors
+        bg = get_subatomic_config('quark_diagram', 'background_color', default=[25, 25, 45])
+        self.background_color = QColor(bg[0], bg[1], bg[2])
+        default_text = get_subatomic_config('quark_diagram', 'default_text_color', default=[100, 100, 100])
+        self.default_text_color = QColor(default_text[0], default_text[1], default_text[2])
+        label_text = get_subatomic_config('quark_diagram', 'label_text_color', default=[150, 150, 150])
+        self.label_text_color = QColor(label_text[0], label_text[1], label_text[2])
+
+        # Arrangement configurations for different quark counts
+        self.arrangements = get_subatomic_config('quark_diagram', 'arrangements', default={})
+
+        # Set widget height constraints based on config
+        min_height = 100  # Default minimum
+        max_height = 120  # Default maximum
+        self.setMinimumHeight(min_height)
+        self.setMaximumHeight(max_height)
 
     def set_particle(self, particle):
         """Set the particle to display"""
         self.particle = particle
         self.update()
 
+    def _get_quarks_from_composition(self):
+        """Extract quark list from particle's Composition field or _parsed_quarks"""
+        if not self.particle:
+            return []
+
+        # First try _parsed_quarks (pre-processed data)
+        quarks = self.particle.get('_parsed_quarks', [])
+        if quarks:
+            return quarks
+
+        # Fall back to parsing Composition field from JSON
+        composition = self.particle.get('Composition', [])
+        if not composition:
+            return []
+
+        quarks = []
+        for comp in composition:
+            constituent = comp.get('Constituent', '')
+            count = comp.get('Count', 1)
+            symbol = comp.get('Symbol', '')
+            is_anti = comp.get('IsAnti', False) or 'Anti' in constituent
+
+            # Determine quark type from constituent name or symbol
+            quark_type = symbol.replace('-bar', '') if symbol else constituent.split()[0].lower()[0]
+
+            for _ in range(count):
+                quarks.append({
+                    'type': quark_type,
+                    'is_anti': is_anti,
+                    'constituent': constituent
+                })
+
+        return quarks
+
+    def _calculate_quark_positions(self, quarks, center_x, center_y):
+        """Calculate positions for quarks dynamically based on count and configuration"""
+        positions = []
+        num_quarks = len(quarks)
+
+        if num_quarks == 0:
+            return positions
+
+        # Get arrangement config for this quark count
+        arrangement = self.arrangements.get(str(num_quarks), {})
+        arr_type = arrangement.get('type', 'linear' if num_quarks <= 2 else 'polygon')
+
+        # Calculate dynamic quark size based on available space and count
+        available_width = self.width() - 40  # Leave margins
+        available_height = self.height() - 30  # Leave space for label
+        max_size_by_space = min(available_width / max(num_quarks, 2), available_height) * 0.6
+        quark_size = max(self.quark_size_min, min(self.quark_size, max_size_by_space, self.quark_size_max))
+
+        if arr_type == 'linear' or num_quarks == 2:
+            # Linear arrangement (mesons)
+            spacing_ratio = arrangement.get('spacing_ratio', 1.4)
+            spacing = self.meson_spacing * spacing_ratio
+            for i, quark in enumerate(quarks):
+                qx = center_x + (i - (num_quarks - 1) / 2) * spacing - quark_size / 2
+                qy = center_y - quark_size / 2
+                positions.append((qx, qy, quark_size, quark))
+
+        elif arr_type == 'triangle' or num_quarks == 3:
+            # Triangle arrangement (baryons)
+            radius_ratio = arrangement.get('radius_ratio', 1.0)
+            top_offset = arrangement.get('top_offset', -1.0)
+            bottom_offset = arrangement.get('bottom_offset', 0.6)
+            radius = self.baryon_radius * radius_ratio
+
+            # Top quark
+            positions.append((
+                center_x - quark_size / 2,
+                center_y + radius * top_offset - quark_size / 2,
+                quark_size, quarks[0]
+            ))
+            # Bottom left
+            if len(quarks) > 1:
+                positions.append((
+                    center_x - radius * 1.2 - quark_size / 2,
+                    center_y + radius * bottom_offset - quark_size / 2,
+                    quark_size, quarks[1]
+                ))
+            # Bottom right
+            if len(quarks) > 2:
+                positions.append((
+                    center_x + radius * 1.2 - quark_size / 2,
+                    center_y + radius * bottom_offset - quark_size / 2,
+                    quark_size, quarks[2]
+                ))
+
+        else:
+            # Generic polygon arrangement for 4+ quarks
+            radius_ratio = arrangement.get('radius_ratio', 1.2)
+            radius = self.baryon_radius * radius_ratio
+            for i, quark in enumerate(quarks):
+                angle = (i * 360 / num_quarks - 90) * math.pi / 180
+                qx = center_x + radius * math.cos(angle) - quark_size / 2
+                qy = center_y + radius * math.sin(angle) - quark_size / 2
+                positions.append((qx, qy, quark_size, quark))
+
+        return positions
+
     def paintEvent(self, event):
-        """Paint the quark diagram"""
+        """Paint the quark diagram using data-driven configuration"""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Background
-        painter.fillRect(self.rect(), QColor(25, 25, 45))
+        # Background from config
+        painter.fillRect(self.rect(), self.background_color)
 
         if not self.particle:
-            painter.setPen(QPen(QColor(100, 100, 100)))
+            painter.setPen(QPen(self.default_text_color))
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Select a particle")
             painter.end()
             return
 
-        quarks = self.particle.get('_parsed_quarks', [])
+        # Get quarks from particle's Composition field or _parsed_quarks
+        quarks = self._get_quarks_from_composition()
         if not quarks:
-            painter.setPen(QPen(QColor(100, 100, 100)))
+            painter.setPen(QPen(self.default_text_color))
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "No quark data")
             painter.end()
             return
 
-        # Draw quarks in a circle or line arrangement
-        quark_size = 35
+        # Calculate center position
         center_x = self.width() / 2
         center_y = self.height() / 2
 
-        if len(quarks) == 3:
-            # Triangle arrangement for baryons
-            radius = 30
-            for i, quark in enumerate(quarks):
-                angle = (i * 120 - 90) * 3.14159 / 180
-                qx = center_x + radius * 1.2 * (0 if i == 0 else (-1 if i == 1 else 1)) - quark_size / 2
-                qy = center_y + (-radius if i == 0 else radius * 0.6) - quark_size / 2
-                self._draw_quark(painter, qx, qy, quark_size, quark)
-        elif len(quarks) == 2:
-            # Side by side for mesons
-            spacing = 50
-            for i, quark in enumerate(quarks):
-                qx = center_x + (i - 0.5) * spacing - quark_size / 2
-                qy = center_y - quark_size / 2
-                self._draw_quark(painter, qx, qy, quark_size, quark)
+        # Calculate dynamic positions based on composition and configuration
+        positions = self._calculate_quark_positions(quarks, center_x, center_y)
 
-        # Draw particle name below
-        painter.setPen(QPen(QColor(150, 150, 150)))
-        font = QFont("Arial", 9)
+        # Draw quarks at calculated positions
+        for qx, qy, quark_size, quark in positions:
+            self._draw_quark(painter, qx, qy, quark_size, quark)
+
+        # Draw particle name/content below using config font size
+        painter.setPen(QPen(self.label_text_color))
+        font = QFont("Arial", self.content_font_size)
         painter.setFont(font)
         quark_content = self.particle.get('QuarkContent', '')
         painter.drawText(0, self.height() - 15, self.width(), 15,
@@ -79,11 +203,11 @@ class QuarkDiagram(QWidget):
         painter.end()
 
     def _draw_quark(self, painter, x, y, size, quark):
-        """Draw a single quark"""
+        """Draw a single quark using configuration values"""
         quark_type = quark.get('type', 'u')
         is_anti = quark.get('is_anti', False)
 
-        # Get color
+        # Get color from quark type
         if is_anti:
             quark_type_full = f"{quark_type}-bar"
         else:
@@ -92,25 +216,27 @@ class QuarkDiagram(QWidget):
         color_tuple = QuarkType.get_color(QuarkType.from_string(quark_type_full))
         color = QColor(color_tuple[0], color_tuple[1], color_tuple[2])
 
-        # Draw glow
+        # Draw glow with configurable size and alpha
         glow = QColor(color)
-        glow.setAlpha(50)
+        glow.setAlpha(self.glow_alpha)
         painter.setBrush(QBrush(glow))
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(int(x - 5), int(y - 5), int(size + 10), int(size + 10))
+        glow_padding = self.glow_extra_size // 2
+        painter.drawEllipse(int(x - glow_padding), int(y - glow_padding),
+                           int(size + self.glow_extra_size), int(size + self.glow_extra_size))
 
-        # Draw quark circle
+        # Draw quark circle with configurable border width
         painter.setBrush(QBrush(color))
-        painter.setPen(QPen(QColor(255, 255, 255), 2))
+        painter.setPen(QPen(QColor(255, 255, 255), self.border_width))
         painter.drawEllipse(int(x), int(y), int(size), int(size))
 
-        # Draw label
+        # Draw label with configurable font size
         painter.setPen(QPen(QColor(0, 0, 0)))
-        font = QFont("Arial", 12, QFont.Weight.Bold)
+        font = QFont("Arial", self.label_font_size, QFont.Weight.Bold)
         painter.setFont(font)
         label = quark_type.upper()
         if is_anti:
-            # Draw overline
+            # Draw label with overline for antiquarks
             painter.drawText(int(x), int(y), int(size), int(size),
                            Qt.AlignmentFlag.AlignCenter, label)
             # Draw overline manually
