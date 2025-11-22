@@ -103,6 +103,7 @@ print("TEST 1: SubatomicCalculatorV2 - Hadron Creation from Quarks")
 print("=" * 80)
 
 # Test cases: (quark_list, name, expected_values)
+# Ground state hadrons tested via create_particle_from_quarks
 hadron_tests = [
     # Proton: uud
     {
@@ -143,6 +144,19 @@ hadron_tests = [
             'Isospin_I3': 1.0
         }
     },
+    # Pion0: (uu-bar - dd-bar)/sqrt(2) - approximated as uu-bar for mass
+    {
+        'quarks': [up_quark, create_antiquark(up_quark)],
+        'name': 'Pion0',
+        'symbol': 'pi0',
+        'expected': {
+            'Charge_e': 0.0,
+            'Mass_MeVc2': 134.98,  # PDG value (lighter than pi+ due to EM effects)
+            'Spin_hbar': 0,
+            'BaryonNumber_B': 0.0,
+            'Isospin_I3': 0.0
+        }
+    },
     # Kaon+: us-bar
     {
         'quarks': [up_quark, anti_strange_quark],
@@ -155,6 +169,31 @@ hadron_tests = [
             'BaryonNumber_B': 0.0,
             'Isospin_I3': 0.5
         }
+    }
+]
+
+# Spin-excited state hadrons tested via calculate_excited_state_mass
+excited_hadron_tests = [
+    # Rho (rho+): ud-bar, spin-1 vector meson
+    {
+        'quarks': [up_quark, anti_down_quark],
+        'name': 'Rho+',
+        'symbol': 'rho+',
+        'expected_mass': 775.26,  # PDG value
+    },
+    # Delta++: uuu, spin-3/2 baryon
+    {
+        'quarks': [up_quark, up_quark, up_quark],
+        'name': 'Delta++',
+        'symbol': 'Delta++',
+        'expected_mass': 1232.0,  # PDG value
+    },
+    # K* (K*+): us-bar, spin-1 vector meson
+    {
+        'quarks': [up_quark, anti_strange_quark],
+        'name': 'K*+',
+        'symbol': 'K*+',
+        'expected_mass': 891.67,  # PDG value
     }
 ]
 
@@ -183,6 +222,32 @@ for test in hadron_tests:
         })
 
         print(f"| {test['name']:8s} | {prop:16s} | {expected_val:8.4f} | {calc_val:10.4f} | {error:6.2f}% | {status:6s} |")
+
+
+# Test excited state hadrons (Rho, Delta, K*)
+print("\n### Spin-Excited State Hadrons (Rho, Delta, K*)\n")
+print("| Particle | Expected Mass | Calculated | Error % | Status |")
+print("|----------|---------------|------------|---------|--------|")
+
+for test in excited_hadron_tests:
+    result = SubatomicCalculatorV2.calculate_excited_state_mass(
+        test['quarks'], spin_state="excited"
+    )
+    calc_mass = result['mass_mev']
+    expected_mass = test['expected_mass']
+    error = calc_error_percent(expected_mass, calc_mass)
+    status = status_from_error(error, threshold=5)  # 5% threshold for mass
+
+    subatomic_results.append({
+        'particle': test['name'],
+        'property': 'Mass_MeVc2',
+        'expected': expected_mass,
+        'calculated': calc_mass,
+        'error': error,
+        'status': status
+    })
+
+    print(f"| {test['name']:10s} | {expected_mass:12.2f} | {calc_mass:10.2f} | {error:6.2f}% | {status:6s} |")
 
 
 # ==================== TEST 2: ATOM CALCULATOR ====================
