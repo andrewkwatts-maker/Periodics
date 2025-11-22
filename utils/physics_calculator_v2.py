@@ -650,6 +650,196 @@ class SubatomicCalculatorV2:
             'is_meson': abs(total_baryon) < 0.01 and len(quark_data_list) == 2
         }
 
+    @classmethod
+    def calculate_magnetic_dipole_moment(cls, quark_data_list: List[Dict], total_charge: float,
+                                          total_mass_mev: float, spin: float) -> Optional[float]:
+        """
+        Estimate magnetic dipole moment from quark composition.
+
+        For hadrons, the magnetic moment arises from:
+        1. Quark intrinsic magnetic moments (∝ charge/mass)
+        2. Orbital angular momentum contributions
+
+        Formula (simplified constituent quark model):
+        μ = Σ(q_i × m_proton/m_i × μ_N × <σ_i>)
+
+        Where:
+        - q_i = quark charge
+        - m_i = constituent quark mass
+        - μ_N = nuclear magneton (5.051e-27 J/T)
+        - <σ_i> = spin expectation value for quark i
+
+        Args:
+            quark_data_list: List of quark JSON objects
+            total_charge: Total charge of particle
+            total_mass_mev: Total mass in MeV
+            spin: Total spin of particle
+
+        Returns:
+            Magnetic dipole moment in J/T, or None if cannot be calculated
+        """
+        if not quark_data_list or spin == 0:
+            return None
+
+        # Nuclear magneton in J/T
+        NUCLEAR_MAGNETON = 5.050783699e-27
+        # Proton mass in MeV for reference
+        PROTON_MASS_MEV = 938.272
+
+        # Calculate magnetic moment using constituent quark model
+        # For spin-1/2 particles, assume quark spins aligned with total spin
+        magnetic_moment = 0.0
+
+        num_quarks = len(quark_data_list)
+
+        for q in quark_data_list:
+            q_charge = q.get('Charge_e', 0)
+            q_mass = q.get('Mass_MeVc2', 2.2)  # Current mass
+
+            # Constituent mass (add QCD dressing)
+            if q_mass < 10:  # Light quark
+                constituent_mass = 336
+            elif q_mass < 200:  # Strange
+                constituent_mass = 486
+            elif q_mass < 2000:  # Charm
+                constituent_mass = q_mass + 200
+            else:  # Heavy
+                constituent_mass = q_mass + 100
+
+            # Magnetic moment contribution: μ_i = q_i × (m_p/m_i) × μ_N × spin_factor
+            # For spin-1/2 baryons with aligned spins, each quark contributes its spin
+            if num_quarks == 3:  # Baryon
+                # In the proton, 2 u-quarks with spin up, 1 d-quark with spin down (simplified)
+                spin_factor = 2/3 if q_charge > 0 else -1/3
+            else:  # Meson
+                spin_factor = 0.5
+
+            mu_quark = q_charge * (PROTON_MASS_MEV / constituent_mass) * NUCLEAR_MAGNETON * spin_factor
+            magnetic_moment += mu_quark
+
+        return magnetic_moment if abs(magnetic_moment) > 1e-30 else None
+
+    @classmethod
+    def calculate_mean_lifetime(cls, half_life_s: Optional[float]) -> Optional[float]:
+        """
+        Calculate mean lifetime from half-life.
+
+        τ (mean lifetime) = t_1/2 / ln(2)
+
+        Args:
+            half_life_s: Half-life in seconds
+
+        Returns:
+            Mean lifetime in seconds
+        """
+        if half_life_s is None or half_life_s <= 0:
+            return None
+        return half_life_s / math.log(2)
+
+    @classmethod
+    def calculate_decay_modes(cls, quark_data_list: List[Dict], total_charge: float,
+                               total_mass_mev: float, stability_info: Dict) -> List[Dict]:
+        """
+        Calculate possible decay modes based on quark content and conservation laws.
+
+        Decay mode determination follows:
+        1. Weak decays: change quark flavor (s→u, c→s, b→c, etc.)
+        2. Electromagnetic decays: preserve flavor, emit photons
+        3. Strong decays: produce quark-antiquark pairs if mass allows
+
+        Conservation laws must be satisfied:
+        - Charge conservation
+        - Baryon number conservation
+        - Lepton number conservation
+        - Energy-momentum conservation
+
+        Args:
+            quark_data_list: List of quark JSON objects
+            total_charge: Total particle charge
+            total_mass_mev: Total particle mass
+            stability_info: Stability information from _determine_stability
+
+        Returns:
+            List of decay mode dictionaries with products and branching ratios
+        """
+        decay_modes = []
+
+        if stability_info.get('status') == 'Stable':
+            return []
+
+        # Get quark content
+        quark_names = [q.get('Name', '').lower() for q in quark_data_list]
+        num_quarks = len(quark_data_list)
+        charge_int = round(total_charge)
+
+        # Determine decay modes based on quark flavor content
+        has_strange = any('strange' in n for n in quark_names)
+        has_charm = any('charm' in n for n in quark_names)
+        has_bottom = any('bottom' in n for n in quark_names)
+        has_top = any('top' in n for n in quark_names)
+
+        if has_top:
+            # Top quarks decay before hadronizing
+            decay_modes.append({
+                'Products': ['W Boson', 'Bottom Quark'],
+                'BranchingRatio': 1.0,
+                'Interaction': 'Weak',
+                'Notes': 'Top quark decays before hadronization'
+            })
+        elif has_bottom:
+            # B hadrons: b → c + W
+            decay_modes.extend([
+                {'Products': ['D Meson', 'Lepton', 'Neutrino'], 'BranchingRatio': 0.11, 'Interaction': 'Weak'},
+                {'Products': ['D* Meson', 'Lepton', 'Neutrino'], 'BranchingRatio': 0.06, 'Interaction': 'Weak'},
+                {'Products': ['Charm Hadron', 'Pions'], 'BranchingRatio': 0.80, 'Interaction': 'Weak'}
+            ])
+        elif has_charm:
+            # Charm hadrons: c → s + W
+            decay_modes.extend([
+                {'Products': ['Kaon', 'Pions'], 'BranchingRatio': 0.60, 'Interaction': 'Weak'},
+                {'Products': ['Strange Hadron', 'Leptons'], 'BranchingRatio': 0.25, 'Interaction': 'Weak'},
+                {'Products': ['Pions', 'Lepton', 'Neutrino'], 'BranchingRatio': 0.15, 'Interaction': 'Weak'}
+            ])
+        elif has_strange:
+            # Strange hadrons: s → u + W
+            if num_quarks == 3:  # Strange baryon
+                decay_modes.extend([
+                    {'Products': ['Nucleon', 'Pion'], 'BranchingRatio': 0.64, 'Interaction': 'Weak'},
+                    {'Products': ['Nucleon', 'Pion', 'Pion'], 'BranchingRatio': 0.25, 'Interaction': 'Weak'},
+                    {'Products': ['Proton', 'Electron', 'Antineutrino'], 'BranchingRatio': 0.08, 'Interaction': 'Weak'}
+                ])
+            else:  # Strange meson (kaons)
+                decay_modes.extend([
+                    {'Products': ['Muon', 'Neutrino'], 'BranchingRatio': 0.63, 'Interaction': 'Weak'},
+                    {'Products': ['Pion', 'Pion'], 'BranchingRatio': 0.21, 'Interaction': 'Weak'},
+                    {'Products': ['Pion', 'Pion', 'Pion'], 'BranchingRatio': 0.12, 'Interaction': 'Weak'},
+                    {'Products': ['Electron', 'Neutrino', 'Pion'], 'BranchingRatio': 0.04, 'Interaction': 'Weak'}
+                ])
+        else:
+            # Light hadrons (u, d only)
+            if num_quarks == 3:  # Nucleon
+                if charge_int == 0:  # Neutron
+                    decay_modes.append({
+                        'Products': ['Proton', 'Electron', 'Electron Antineutrino'],
+                        'BranchingRatio': 1.0,
+                        'Interaction': 'Weak',
+                        'Notes': 'Free neutron beta decay'
+                    })
+                # Proton is stable in Standard Model
+            else:  # Pions
+                if charge_int != 0:  # Charged pion
+                    decay_modes.extend([
+                        {'Products': ['Muon', 'Muon Neutrino'], 'BranchingRatio': 0.9999, 'Interaction': 'Weak'},
+                        {'Products': ['Electron', 'Electron Neutrino'], 'BranchingRatio': 0.0001, 'Interaction': 'Weak'}
+                    ])
+                else:  # Neutral pion
+                    decay_modes.extend([
+                        {'Products': ['Photon', 'Photon'], 'BranchingRatio': 0.988, 'Interaction': 'Electromagnetic'},
+                        {'Products': ['Electron', 'Positron', 'Photon'], 'BranchingRatio': 0.012, 'Interaction': 'Electromagnetic'}
+                    ])
+
+        return decay_modes
+
 
 # ==================== Atom Calculator V2 ====================
 
@@ -1532,6 +1722,284 @@ class AtomCalculatorV2:
             'stability_estimate': stability,
             'calculation_details': mass_result['details']
         }
+
+    @classmethod
+    def _calculate_electron_affinity(cls, Z: int, block: str, period: int,
+                                      group: Optional[int], electronegativity: float) -> float:
+        """
+        Calculate electron affinity from periodic position and electronegativity.
+
+        Electron affinity (EA) is the energy released when an electron is added.
+        Correlations:
+        - EA ∝ electronegativity (more EN = higher EA)
+        - Halogens have highest EA
+        - Noble gases and alkaline earths have low/negative EA
+        - Decreases down a group
+
+        Formula: EA ≈ k × EN² / atomic_radius_factor
+
+        Args:
+            Z: Atomic number
+            block: Element block (s, p, d, f)
+            period: Period number
+            group: Group number
+            electronegativity: Pauling electronegativity
+
+        Returns:
+            Electron affinity in kJ/mol
+        """
+        if Z == 0 or electronegativity == 0:
+            return 0.0
+
+        # Noble gases - near zero or negative EA
+        noble_gases = {2, 10, 18, 36, 54, 86, 118}
+        if Z in noble_gases:
+            return -48 + period * 5  # Slightly less negative for heavier noble gases
+
+        # Alkaline earths - very low EA (filled s subshell)
+        if group == 2:
+            return -20 + period * 3
+
+        # Halogens - highest EA
+        if group == 17:
+            base_ea = 349  # Chlorine reference
+            return base_ea - (period - 3) * 30  # Decreases down group
+
+        # General correlation with electronegativity
+        # EA ∝ EN² approximately
+        base_ea = electronegativity ** 2 * 25
+
+        # Block adjustments
+        if block == 's':
+            base_ea *= 0.4  # Lower for s-block
+        elif block == 'p':
+            base_ea *= 1.2  # Higher for p-block (except noble gases)
+        elif block == 'd':
+            base_ea *= 0.6  # Moderate for d-block
+        elif block == 'f':
+            base_ea *= 0.3  # Low for f-block
+
+        # Period trend (smaller atoms have higher EA)
+        period_factor = 1.2 - 0.05 * (period - 2)
+        base_ea *= max(0.5, period_factor)
+
+        return round(max(-100, min(350, base_ea)), 1)
+
+    @classmethod
+    def _calculate_covalent_radius(cls, atomic_radius: int, block: str, period: int) -> int:
+        """
+        Calculate covalent radius from atomic radius.
+
+        Covalent radius is typically 70-90% of atomic (van der Waals) radius.
+        The ratio depends on element type.
+
+        Formula: r_cov ≈ r_atomic × factor
+
+        Args:
+            atomic_radius: Atomic radius in pm
+            block: Element block
+            period: Period number
+
+        Returns:
+            Covalent radius in pm
+        """
+        if atomic_radius == 0:
+            return 0
+
+        # Covalent/atomic radius ratios by block
+        if block == 's':
+            ratio = 0.70 if period <= 3 else 0.65  # Large alkali have lower ratio
+        elif block == 'p':
+            ratio = 0.85  # More similar for p-block
+        elif block == 'd':
+            ratio = 0.75  # Transition metals
+        elif block == 'f':
+            ratio = 0.80  # Lanthanides/actinides
+        else:
+            ratio = 0.77  # Default
+
+        covalent_radius = int(atomic_radius * ratio)
+        return max(20, min(250, covalent_radius))
+
+    @classmethod
+    def _calculate_emission_wavelength(cls, Z: int, ionization_energy: float) -> float:
+        """
+        Calculate primary emission wavelength from ionization energy.
+
+        The primary emission line corresponds to electronic transitions.
+        Using Rydberg formula and ionization energy correlation:
+
+        λ ∝ 1/ΔE, where ΔE relates to ionization energy
+
+        For alkali metals: prominent lines in visible spectrum
+        For other elements: correlation with IE
+
+        Args:
+            Z: Atomic number
+            ionization_energy: First ionization energy in eV
+
+        Returns:
+            Primary emission wavelength in nm
+        """
+        if Z == 0 or ionization_energy == 0:
+            return 0.0
+
+        # Known characteristic emission lines (nm) for calibration
+        known_lines = {
+            1: 656.3,   # Hydrogen Balmer alpha
+            2: 587.6,   # Helium D3
+            3: 670.8,   # Lithium
+            11: 589.3,  # Sodium D line
+            19: 766.5,  # Potassium
+            20: 422.7,  # Calcium
+            26: 372.0,  # Iron
+            29: 324.8,  # Copper
+            47: 328.1,  # Silver
+            79: 267.6,  # Gold
+        }
+
+        if Z in known_lines:
+            return known_lines[Z]
+
+        # Estimate from ionization energy
+        # Higher IE → shorter wavelength (more energy needed)
+        # λ (nm) ≈ 1240 / E (eV) for photon energy relation
+        # Use IE as rough proxy for emission transition energy
+        # Typical emission is at fraction of IE
+
+        # Empirical correlation: primary visible emission
+        energy_fraction = 0.15  # Typical visible transition is ~15% of IE
+        photon_energy = ionization_energy * energy_fraction
+
+        if photon_energy > 0.1:
+            wavelength = 1240 / photon_energy
+        else:
+            wavelength = 500  # Default visible
+
+        # Clamp to reasonable range (UV to IR)
+        return round(max(200, min(1500, wavelength)), 1)
+
+    @classmethod
+    def _generate_isotopes(cls, Z: int, proton_mass_amu: float, neutron_mass_amu: float) -> List[Dict]:
+        """
+        Generate isotope information for an element.
+
+        Uses nuclear stability rules:
+        - Stable nuclei follow the valley of stability
+        - N/Z ratio increases with Z for stability
+        - Even-even nuclei are more stable
+        - Magic numbers (2, 8, 20, 28, 50, 82, 126) give extra stability
+
+        Args:
+            Z: Atomic number (proton count)
+            proton_mass_amu: Proton mass from input JSON
+            neutron_mass_amu: Neutron mass from input JSON
+
+        Returns:
+            List of isotope dictionaries with mass_number, neutrons, abundance, stability
+        """
+        if Z == 0:
+            return []
+
+        isotopes = []
+        magic_numbers = {2, 8, 20, 28, 50, 82, 126}
+
+        # Calculate optimal N/Z ratio based on liquid drop model
+        # For stable nuclei: N ≈ Z for light, N > Z for heavy
+        if Z <= 20:
+            optimal_N = Z
+        elif Z <= 50:
+            optimal_N = int(Z * 1.2)
+        elif Z <= 82:
+            optimal_N = int(Z * 1.4)
+        else:
+            optimal_N = int(Z * 1.5)
+
+        # Generate isotopes around optimal neutron number
+        # Lighter elements have fewer stable isotopes
+        isotope_range = 2 if Z <= 10 else (4 if Z <= 30 else 6)
+
+        total_abundance = 0
+        temp_isotopes = []
+
+        for delta in range(-isotope_range, isotope_range + 1):
+            N = optimal_N + delta
+            if N < 0:
+                continue
+
+            A = Z + N
+
+            # Calculate stability from binding energy considerations
+            # Even-even nuclei are most stable
+            even_Z = (Z % 2 == 0)
+            even_N = (N % 2 == 0)
+
+            stability_score = 0
+            if even_Z and even_N:
+                stability_score += 2
+            elif even_Z or even_N:
+                stability_score += 1
+
+            # Magic numbers bonus
+            if Z in magic_numbers:
+                stability_score += 1
+            if N in magic_numbers:
+                stability_score += 1
+
+            # N/Z ratio penalty
+            nz_ratio = N / Z if Z > 0 else 0
+            expected_ratio = optimal_N / Z if Z > 0 else 1
+            ratio_deviation = abs(nz_ratio - expected_ratio)
+            stability_score -= ratio_deviation * 3
+
+            # Determine if stable based on score and element
+            is_stable = stability_score >= 2 and delta <= 2 and delta >= -2
+
+            # Estimate abundance (most abundant near optimal)
+            if is_stable:
+                abundance = max(0.1, 50 - abs(delta) * 20)
+                total_abundance += abundance
+            else:
+                abundance = 0
+
+            # Estimate half-life for unstable isotopes
+            if not is_stable:
+                # Further from stability = shorter half-life
+                if abs(delta) <= 3:
+                    half_life = 10 ** (10 - abs(delta) * 3)  # Years to seconds
+                else:
+                    half_life = 0.01  # Very short-lived
+            else:
+                half_life = None
+
+            temp_isotopes.append({
+                'mass_number': A,
+                'neutrons': N,
+                'abundance': abundance,
+                'is_stable': is_stable,
+                'half_life': half_life,
+                'stability_score': stability_score
+            })
+
+        # Normalize abundances
+        if total_abundance > 0:
+            for iso in temp_isotopes:
+                iso['abundance'] = round(iso['abundance'] / total_abundance * 100, 3)
+
+        # Sort by abundance (most abundant first) and take top isotopes
+        temp_isotopes.sort(key=lambda x: -x['abundance'])
+        isotopes = [
+            {
+                'mass_number': iso['mass_number'],
+                'neutrons': iso['neutrons'],
+                'abundance': iso['abundance'],
+                'is_stable': iso['is_stable'],
+                'half_life': iso['half_life']
+            }
+            for iso in temp_isotopes[:8]  # Keep top 8 isotopes
+        ]
+
+        return isotopes
 
 
 # ==================== Molecule Calculator V2 ====================

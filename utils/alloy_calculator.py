@@ -171,9 +171,9 @@ class AlloyCalculator:
                 'Density_g_cm3': round(density, 3),
                 'MeltingPoint_K': round(melting_point, 1),
                 'ThermalConductivity_W_mK': round(thermal_conductivity, 1),
-                'ThermalExpansion_per_K': 15e-6,  # Typical value
+                'ThermalExpansion_per_K': cls._calculate_thermal_expansion(elements, weight_fractions) * 1e-6,
                 'ElectricalResistivity_Ohm_m': electrical_resistivity,
-                'SpecificHeat_J_kgK': 500,  # Typical for metals
+                'SpecificHeat_J_kgK': cls._calculate_specific_heat(elements, weight_fractions),
                 'YoungsModulus_GPa': round(estimated_strength['youngs_modulus'], 1),
                 'ShearModulus_GPa': round(estimated_strength['youngs_modulus'] / 2.6, 1),
                 'PoissonsRatio': 0.30,
@@ -204,6 +204,8 @@ class AlloyCalculator:
                 'CoordinationNumber': cls._get_coordination_number(lattice_type)
             },
 
+            'PhaseComposition': cls._estimate_phase_composition(elements, weight_fractions, lattice_type),
+
             'Microstructure': {
                 'GrainStructure': {
                     'AverageGrainSize_um': 50,
@@ -219,6 +221,8 @@ class AlloyCalculator:
                     'NoisePersistence': 0.5
                 }
             },
+
+            'CorrosionResistance': cls._calculate_corrosion_resistance(elements, weight_fractions),
 
             'Applications': [],
             'ProcessingMethods': [],
@@ -491,6 +495,323 @@ class AlloyCalculator:
             'Pb': '#666666'   # Dark grey
         }
         return colors.get(primary_element, '#C0C0C0')
+
+    @classmethod
+    def _calculate_thermal_expansion(cls, elements: List[str], weight_fractions: List[float]) -> float:
+        """
+        Calculate coefficient of thermal expansion using rule of mixtures.
+
+        CTE_alloy ≈ Σ(w_i × CTE_i)
+
+        Args:
+            elements: List of element symbols
+            weight_fractions: Weight fractions
+
+        Returns:
+            Thermal expansion coefficient in per K (×10^-6)
+        """
+        # Thermal expansion coefficients for elements (×10^-6 /K)
+        element_cte = {
+            'Fe': 11.8, 'Al': 23.1, 'Cu': 16.5, 'Ni': 13.4, 'Cr': 4.9,
+            'Ti': 8.6, 'Zn': 30.2, 'Sn': 22.0, 'Mn': 21.7, 'Mo': 4.8,
+            'W': 4.5, 'V': 8.4, 'Co': 13.0, 'Nb': 7.3, 'Si': 2.6,
+            'Ag': 18.9, 'Au': 14.2, 'Pb': 28.9, 'C': 1.0, 'Mg': 24.8
+        }
+
+        weighted_cte = 0
+        for elem, wf in zip(elements, weight_fractions):
+            cte = element_cte.get(elem, 12.0)  # Default 12 ppm/K
+            weighted_cte += wf * cte
+
+        return round(weighted_cte, 1)
+
+    @classmethod
+    def _calculate_specific_heat(cls, elements: List[str], weight_fractions: List[float]) -> float:
+        """
+        Calculate specific heat capacity using Kopp-Neumann rule.
+
+        Cp_alloy ≈ Σ(w_i × Cp_i)
+
+        For metals, Dulong-Petit law gives ~25 J/(mol·K) per atom
+        Cp (J/kg·K) = 25 / M × 1000
+
+        Args:
+            elements: List of element symbols
+            weight_fractions: Weight fractions
+
+        Returns:
+            Specific heat in J/(kg·K)
+        """
+        # Specific heat capacities (J/kg·K)
+        element_cp = {
+            'Fe': 449, 'Al': 897, 'Cu': 385, 'Ni': 444, 'Cr': 449,
+            'Ti': 523, 'Zn': 388, 'Sn': 228, 'Mn': 479, 'Mo': 251,
+            'W': 132, 'V': 489, 'Co': 421, 'Nb': 265, 'Si': 705,
+            'Ag': 235, 'Au': 129, 'Pb': 129, 'C': 709, 'Mg': 1023, 'N': 1040
+        }
+
+        weighted_cp = 0
+        for elem, wf in zip(elements, weight_fractions):
+            cp = element_cp.get(elem, 450)  # Default 450 J/kg·K
+            weighted_cp += wf * cp
+
+        return round(weighted_cp, 0)
+
+    @classmethod
+    def _calculate_corrosion_resistance(cls, elements: List[str], weight_fractions: List[float]) -> Dict:
+        """
+        Calculate corrosion resistance metrics.
+
+        PREN (Pitting Resistance Equivalent Number):
+        PREN = %Cr + 3.3×%Mo + 16×%N
+
+        Higher PREN = better pitting corrosion resistance
+        PREN > 40 is considered highly corrosion resistant
+
+        Args:
+            elements: List of element symbols
+            weight_fractions: Weight fractions
+
+        Returns:
+            Dict with PREN, passivation film, and corrosion rating
+        """
+        # Get element percentages
+        elem_percent = {elem: wf * 100 for elem, wf in zip(elements, weight_fractions)}
+
+        cr_pct = elem_percent.get('Cr', 0)
+        mo_pct = elem_percent.get('Mo', 0)
+        n_pct = elem_percent.get('N', 0)
+        ni_pct = elem_percent.get('Ni', 0)
+
+        # Calculate PREN
+        pren = cr_pct + 3.3 * mo_pct + 16 * n_pct
+
+        # Determine passivation film composition
+        if cr_pct >= 10.5:
+            passivation_film = "Cr2O3"
+        elif elem_percent.get('Al', 0) > 1:
+            passivation_film = "Al2O3"
+        elif elem_percent.get('Ti', 0) > 1:
+            passivation_film = "TiO2"
+        else:
+            passivation_film = "FeO/Fe2O3"
+
+        # Pitting potential estimate (mV vs SCE)
+        if pren > 40:
+            pitting_potential = 400 + (pren - 40) * 5
+            rating = "Excellent"
+        elif pren > 25:
+            pitting_potential = 200 + (pren - 25) * 13
+            rating = "Good"
+        elif pren > 15:
+            pitting_potential = 50 + (pren - 15) * 15
+            rating = "Moderate"
+        else:
+            pitting_potential = pren * 3
+            rating = "Poor"
+
+        # Critical pitting temperature (K)
+        cpt = 253 + pren * 2  # Rough estimate
+
+        return {
+            'PREN': round(pren, 1),
+            'PassivationFilmComposition': passivation_film,
+            'PittingPotential_mV_SCE': round(pitting_potential, 0),
+            'CriticalPittingTemperature_K': round(cpt, 0),
+            'CorrosionRating': rating,
+            'Details': {
+                'Cr_percent': cr_pct,
+                'Mo_percent': mo_pct,
+                'N_percent': n_pct,
+                'formula': 'PREN = %Cr + 3.3×%Mo + 16×%N'
+            }
+        }
+
+    @classmethod
+    def _estimate_phase_composition(cls, elements: List[str], weight_fractions: List[float],
+                                     lattice_type: str) -> Dict:
+        """
+        Estimate phase composition from alloy composition.
+
+        Uses empirical rules:
+        - Ni equivalents determine austenite stability
+        - Cr equivalents determine ferrite formation
+        - Schaeffler diagram concepts for stainless steels
+
+        Ni_eq = %Ni + 30×%C + 0.5×%Mn
+        Cr_eq = %Cr + %Mo + 1.5×%Si + 0.5×%Nb
+
+        Args:
+            elements: List of element symbols
+            weight_fractions: Weight fractions
+            lattice_type: Primary lattice structure
+
+        Returns:
+            Dict with phases and their volume fractions
+        """
+        # Get element percentages
+        elem_pct = {elem: wf * 100 for elem, wf in zip(elements, weight_fractions)}
+
+        ni_pct = elem_pct.get('Ni', 0)
+        cr_pct = elem_pct.get('Cr', 0)
+        c_pct = elem_pct.get('C', 0)
+        mn_pct = elem_pct.get('Mn', 0)
+        mo_pct = elem_pct.get('Mo', 0)
+        si_pct = elem_pct.get('Si', 0)
+        nb_pct = elem_pct.get('Nb', 0)
+
+        # Calculate Schaeffler equivalents
+        ni_eq = ni_pct + 30 * c_pct + 0.5 * mn_pct
+        cr_eq = cr_pct + mo_pct + 1.5 * si_pct + 0.5 * nb_pct
+
+        phases = []
+
+        # Determine phases using Schaeffler-like approach
+        if 'Fe' in elements and cr_pct > 10:
+            # Stainless steel - use Schaeffler diagram logic
+            if ni_eq > 12 and cr_eq < 25:
+                # Austenitic region
+                phases.append({
+                    'Name': 'Austenite',
+                    'Symbol': 'gamma',
+                    'Structure': 'FCC',
+                    'VolumePercent': 95,
+                    'Magnetic': False,
+                    'Hardness_HV': 180
+                })
+                if cr_eq > 18:
+                    phases.append({
+                        'Name': 'Delta Ferrite',
+                        'Symbol': 'delta',
+                        'Structure': 'BCC',
+                        'VolumePercent': 5,
+                        'Magnetic': True,
+                        'Hardness_HV': 200
+                    })
+            elif cr_eq > 18 and ni_eq < 8:
+                # Ferritic region
+                phases.append({
+                    'Name': 'Ferrite',
+                    'Symbol': 'alpha',
+                    'Structure': 'BCC',
+                    'VolumePercent': 100,
+                    'Magnetic': True,
+                    'Hardness_HV': 200
+                })
+            elif ni_eq > 8 and ni_eq < 12:
+                # Duplex region
+                austenite_pct = min(70, max(30, ni_eq * 5))
+                phases.extend([
+                    {
+                        'Name': 'Austenite',
+                        'Symbol': 'gamma',
+                        'Structure': 'FCC',
+                        'VolumePercent': int(austenite_pct),
+                        'Magnetic': False,
+                        'Hardness_HV': 180
+                    },
+                    {
+                        'Name': 'Ferrite',
+                        'Symbol': 'alpha',
+                        'Structure': 'BCC',
+                        'VolumePercent': int(100 - austenite_pct),
+                        'Magnetic': True,
+                        'Hardness_HV': 200
+                    }
+                ])
+            else:
+                # Martensitic or mixed
+                phases.append({
+                    'Name': 'Martensite',
+                    'Symbol': 'alpha_prime',
+                    'Structure': 'BCT',
+                    'VolumePercent': 90,
+                    'Magnetic': True,
+                    'Hardness_HV': 300 + c_pct * 500
+                })
+        elif 'Al' in elements and elem_pct.get('Al', 0) > 80:
+            # Aluminum alloys
+            phases.append({
+                'Name': 'Alpha Aluminum',
+                'Symbol': 'alpha',
+                'Structure': 'FCC',
+                'VolumePercent': 95,
+                'Magnetic': False,
+                'Hardness_HV': 50
+            })
+            if elem_pct.get('Cu', 0) > 2:
+                phases.append({
+                    'Name': 'Theta (Al2Cu)',
+                    'Symbol': 'theta',
+                    'Structure': 'Tetragonal',
+                    'VolumePercent': 5,
+                    'Magnetic': False,
+                    'Hardness_HV': 200
+                })
+        elif 'Cu' in elements and elem_pct.get('Cu', 0) > 50:
+            # Copper alloys
+            phases.append({
+                'Name': 'Alpha Copper',
+                'Symbol': 'alpha',
+                'Structure': 'FCC',
+                'VolumePercent': 100,
+                'Magnetic': False,
+                'Hardness_HV': 80
+            })
+        elif 'Ti' in elements and elem_pct.get('Ti', 0) > 70:
+            # Titanium alloys
+            al_pct = elem_pct.get('Al', 0)
+            v_pct = elem_pct.get('V', 0)
+            if v_pct > 3:
+                # Alpha-beta alloy
+                beta_pct = min(40, v_pct * 8)
+                phases.extend([
+                    {
+                        'Name': 'Alpha Titanium',
+                        'Symbol': 'alpha',
+                        'Structure': 'HCP',
+                        'VolumePercent': int(100 - beta_pct),
+                        'Magnetic': False,
+                        'Hardness_HV': 300
+                    },
+                    {
+                        'Name': 'Beta Titanium',
+                        'Symbol': 'beta',
+                        'Structure': 'BCC',
+                        'VolumePercent': int(beta_pct),
+                        'Magnetic': False,
+                        'Hardness_HV': 350
+                    }
+                ])
+            else:
+                phases.append({
+                    'Name': 'Alpha Titanium',
+                    'Symbol': 'alpha',
+                    'Structure': 'HCP',
+                    'VolumePercent': 100,
+                    'Magnetic': False,
+                    'Hardness_HV': 300
+                })
+        else:
+            # Generic single phase
+            phases.append({
+                'Name': 'Matrix',
+                'Symbol': 'matrix',
+                'Structure': lattice_type,
+                'VolumePercent': 100,
+                'Magnetic': 'Fe' in elements or 'Ni' in elements or 'Co' in elements,
+                'Hardness_HV': 150
+            })
+
+        return {
+            'Phases': phases,
+            'NickelEquivalent': round(ni_eq, 1),
+            'ChromiumEquivalent': round(cr_eq, 1),
+            'TransformationTemperatures': {
+                'Ms_K': 273 + 500 - 350 * c_pct - 35 * mn_pct if c_pct > 0 else None,
+                'Mf_K': 273 + 350 - 350 * c_pct - 35 * mn_pct if c_pct > 0 else None
+            }
+        }
 
 
 # ==================== Convenience Functions ====================
