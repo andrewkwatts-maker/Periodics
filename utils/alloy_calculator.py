@@ -329,10 +329,32 @@ class AlloyCalculator:
         return weighted_a / total_frac if total_frac > 0 else 350
 
     @classmethod
+    def _get_element_data(cls, elements: List[str]) -> List[Dict]:
+        """Get element data dictionaries for use with predictive physics."""
+        element_data = []
+        for elem in elements:
+            element_data.append({
+                'symbol': elem,
+                'Symbol': elem,
+                'Element': elem,
+                'density': AlloyConstants.ELEMENT_DENSITIES.get(elem, 7.0),
+                'melting_point': AlloyConstants.ELEMENT_MELTING_POINTS.get(elem, 1500),
+                'atomic_mass': AlloyConstants.ATOMIC_MASSES.get(elem, 50),
+            })
+        return element_data
+
+    @classmethod
     def _estimate_strength(cls, elements: List[str], weight_fractions: List[float],
                            density: float) -> Dict:
         """
-        Estimate mechanical properties using empirical correlations.
+        Estimate strength using all element sub-properties.
+
+        Uses the predictive physics engine for comprehensive property prediction
+        including:
+        - Solid solution strengthening
+        - Precipitation hardening estimates
+        - Hall-Petch grain size effects
+        - Element position predictions in crystal lattice
 
         Improved model includes:
         - Base strength from alloy category
@@ -340,6 +362,29 @@ class AlloyCalculator:
         - Precipitation/phase strengthening
         - Alloy-specific empirical factors
         """
+        # Use predictive physics engine for comprehensive calculation
+        from utils.predictive_physics import UniversalPredictor
+
+        # Get full element data
+        element_data = cls._get_element_data(elements)
+
+        predictor = UniversalPredictor()
+        result = predictor.predict_alloy_properties(element_data, weight_fractions)
+
+        # Return in expected format with enhanced details
+        return {
+            'tensile_strength': result['tensile_strength'],
+            'yield_strength': result['yield_strength'],
+            'elongation': result['elongation'],
+            'hardness': result['hardness'],
+            'youngs_modulus': result['youngs_modulus'],
+            'element_positions': result.get('element_positions', []),
+            'uncertainty': result.get('uncertainty', {}),
+            'method': result.get('method', 'predictive_physics'),
+            'details': result.get('details', {})
+        }
+
+        # Legacy calculation follows for backward compatibility reference
         # Get element percentages for calculations
         elem_pct = {elem: wf * 100 for elem, wf in zip(elements, weight_fractions)}
 

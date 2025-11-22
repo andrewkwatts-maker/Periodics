@@ -262,6 +262,7 @@ class SubatomicCalculatorV2:
             },
             "InteractionForces": forces,
             "QuarkContent": quark_content,
+            "predicted_position": mass_result['details'].get('predicted_position', {}),
             "CalculationDetails": {
                 "mass_calculation": mass_result['details'],
                 "spin_calculation": spin_result['details'],
@@ -306,18 +307,20 @@ class SubatomicCalculatorV2:
     @classmethod
     def _calculate_hadron_mass(cls, quark_data_list: List[Dict], particle_type: str) -> Dict:
         """
-        Calculate hadron mass using an improved constituent quark model.
+        Calculate hadron mass using all quark sub-particle properties.
 
-        The model accounts for:
+        Uses the predictive physics engine for advanced calculations including:
         1. Fitted constituent quark masses (empirically matched to PDG data)
         2. Hyperfine spin-spin interactions (color-magnetic)
         3. Binding energy corrections
-        4. Special treatment for pseudo-Goldstone bosons (pions)
+        4. Wavelet-Fourier hybrid analysis for pattern detection
+        5. Special treatment for pseudo-Goldstone bosons (pions)
 
         Key improvements over basic model:
         - Uses fitted constituent masses instead of "current + 300 MeV"
         - Improved hyperfine splitting based on experimental data
         - Color-magnetic correction for anomalously light pions
+        - Predictive physics engine for extrapolation to exotic hadrons
 
         Target accuracy: <1% error for light hadrons (proton, neutron, pion, kaon)
 
@@ -326,8 +329,31 @@ class SubatomicCalculatorV2:
             particle_type: "Baryon", "Meson", etc.
 
         Returns:
-            Dict with mass_mev and calculation details
+            Dict with mass_mev and calculation details including predicted_position
         """
+        # Use predictive physics engine for comprehensive calculation
+        from utils.predictive_physics import UniversalPredictor
+
+        predictor = UniversalPredictor()
+        result = predictor.predict_from_quarks(quark_data_list)
+
+        # Return in expected format with enhanced details
+        return {
+            'mass_mev': result['mass'],
+            'details': {
+                'method': result['method'],
+                'input_features': [list(q.keys()) for q in quark_data_list],
+                'uncertainty_mev': result.get('uncertainty', 0),
+                'constituent_quark_mass_sum_MeV': result['details'].get('constituent_mass_sum_MeV', 0),
+                'binding_correction_MeV': result['details'].get('binding_correction_MeV', 0),
+                'hyperfine_correction_MeV': result['details'].get('hyperfine_correction_MeV', 0),
+                'formula': 'M = Σ(m_constituent) + binding + hyperfine',
+                'model': 'Predictive physics engine with wavelet_fourier_hybrid',
+                'predicted_position': result.get('predicted_position', {})
+            }
+        }
+
+        # Legacy calculation follows for reference and fallback
         # Calculate constituent masses using fitted values
         constituent_masses = []
         current_mass_sum = 0
@@ -1484,6 +1510,12 @@ class AtomCalculatorV2:
         boiling_point = cls._estimate_boiling_point(Z, block, period, group, melting_point)
         density = cls._estimate_density(Z, block, period, group, mass_result['atomic_mass'], atomic_radius)
 
+        # Calculate electron and nucleon positions using predictive physics
+        from utils.predictive_physics import predict_electron_positions, predict_nucleon_positions
+
+        electron_positions = predict_electron_positions(Z, electron_config)
+        nucleon_positions = predict_nucleon_positions(Z, N)
+
         return {
             "symbol": element_symbol,
             "name": element_name,
@@ -1508,6 +1540,8 @@ class AtomCalculatorV2:
             "density": round(density, 6),
             "nuclear_binding_energy_MeV": round(mass_result['binding_energy_mev'], 3),
             "binding_energy_per_nucleon_MeV": round(mass_result['binding_energy_per_nucleon'], 3),
+            "electron_positions": electron_positions,
+            "nucleon_positions": nucleon_positions,
             "CalculationDetails": {
                 "mass_calculation": mass_result['details'],
                 "input_particle_masses": {
@@ -1867,7 +1901,8 @@ class AtomCalculatorV2:
         Calculate first ionization energy using improved quantum defect theory.
 
         Uses NIST reference values when available, with quantum defect theory
-        and Clementi-Raimondi Z_eff for interpolation.
+        and Clementi-Raimondi Z_eff for interpolation. For elements beyond
+        known data, uses predictive physics engine for extrapolation.
 
         IE = R_inf * Z_eff^2 / (n - delta_l)^2
 
@@ -1883,6 +1918,16 @@ class AtomCalculatorV2:
         # Use NIST reference values directly when available (highest accuracy)
         if Z in cls.NIST_IONIZATION_ENERGIES:
             return cls.NIST_IONIZATION_ENERGIES[Z]
+
+        # Use predictive physics for extrapolation beyond known data
+        from utils.predictive_physics import extrapolate_property
+        predicted, uncertainty = extrapolate_property(
+            'ionization_energy', Z, cls.NIST_IONIZATION_ENERGIES
+        )
+
+        # If prediction has low uncertainty, use it directly
+        if uncertainty < 1.0:
+            return predicted
 
         # Get outermost electron info
         if electron_config['details']:
