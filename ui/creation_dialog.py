@@ -71,24 +71,33 @@ class AtomCreationDialog(QDialog):
         particle_layout = QGridLayout(particle_group)
 
         # Protons
-        particle_layout.addWidget(QLabel("Protons (Z):"), 0, 0)
+        protons_label = QLabel("Protons (Z):")
+        protons_label.setToolTip("Atomic number - defines the element identity")
+        particle_layout.addWidget(protons_label, 0, 0)
         self.protons_spin = QSpinBox()
+        self.protons_spin.setToolTip("Number of protons in the nucleus (1-118)")
         self.protons_spin.setRange(1, 118)
         self.protons_spin.setValue(1)
         self.protons_spin.valueChanged.connect(self.on_particle_changed)
         particle_layout.addWidget(self.protons_spin, 0, 1)
 
         # Neutrons
-        particle_layout.addWidget(QLabel("Neutrons (N):"), 1, 0)
+        neutrons_label = QLabel("Neutrons (N):")
+        neutrons_label.setToolTip("Determines the isotope - affects atomic mass and stability")
+        particle_layout.addWidget(neutrons_label, 1, 0)
         self.neutrons_spin = QSpinBox()
+        self.neutrons_spin.setToolTip("Number of neutrons in the nucleus (0-200)")
         self.neutrons_spin.setRange(0, 200)
         self.neutrons_spin.setValue(0)
         self.neutrons_spin.valueChanged.connect(self.on_particle_changed)
         particle_layout.addWidget(self.neutrons_spin, 1, 1)
 
         # Electrons
-        particle_layout.addWidget(QLabel("Electrons:"), 2, 0)
+        electrons_label = QLabel("Electrons:")
+        electrons_label.setToolTip("Determines ionic charge - neutral when equal to protons")
+        particle_layout.addWidget(electrons_label, 2, 0)
         self.electrons_spin = QSpinBox()
+        self.electrons_spin.setToolTip("Number of electrons orbiting the nucleus (0-118)")
         self.electrons_spin.setRange(0, 118)
         self.electrons_spin.setValue(1)
         self.electrons_spin.valueChanged.connect(self.on_particle_changed)
@@ -96,6 +105,7 @@ class AtomCreationDialog(QDialog):
 
         # Match electrons checkbox
         self.match_electrons = QCheckBox("Match electrons to protons (neutral)")
+        self.match_electrons.setToolTip("Keep the atom electrically neutral by matching electrons to protons")
         self.match_electrons.setChecked(True)
         self.match_electrons.stateChanged.connect(self.on_match_electrons_changed)
         particle_layout.addWidget(self.match_electrons, 3, 0, 1, 2)
@@ -106,15 +116,21 @@ class AtomCreationDialog(QDialog):
         name_group = QGroupBox("Element Identity")
         name_layout = QGridLayout(name_group)
 
-        name_layout.addWidget(QLabel("Symbol:"), 0, 0)
+        symbol_label = QLabel("Symbol:")
+        symbol_label.setToolTip("1-3 letter element symbol (e.g., H, He, Li)")
+        name_layout.addWidget(symbol_label, 0, 0)
         self.symbol_edit = QLineEdit()
+        self.symbol_edit.setToolTip("Enter a unique element symbol (required)")
         self.symbol_edit.setMaxLength(3)
         self.symbol_edit.setPlaceholderText("e.g., H, He, Li")
         self.symbol_edit.textChanged.connect(self.update_preview)
         name_layout.addWidget(self.symbol_edit, 0, 1)
 
-        name_layout.addWidget(QLabel("Name:"), 1, 0)
+        name_label = QLabel("Name:")
+        name_label.setToolTip("Full element name")
+        name_layout.addWidget(name_label, 1, 0)
         self.name_edit = QLineEdit()
+        self.name_edit.setToolTip("Enter the element's full name (required)")
         self.name_edit.setPlaceholderText("e.g., Hydrogen, Helium")
         self.name_edit.textChanged.connect(self.update_preview)
         name_layout.addWidget(self.name_edit, 1, 1)
@@ -319,6 +335,10 @@ class SubatomicCreationDialog(QDialog):
         # Info label
         info = QLabel("Select 3 quarks for a baryon (e.g., proton=uud) or 2 for a meson (quark + antiquark)")
         info.setStyleSheet("color: #888; font-style: italic;")
+        info.setToolTip(
+            "Baryons: 3 quarks (e.g., proton = uud, neutron = udd)\n"
+            "Mesons: 1 quark + 1 antiquark (e.g., pion+ = u + anti-d)"
+        )
         layout.addWidget(info)
 
         # Main splitter
@@ -381,20 +401,30 @@ class SubatomicCreationDialog(QDialog):
         name_group = QGroupBox("Particle Identity")
         name_layout = QGridLayout(name_group)
 
-        name_layout.addWidget(QLabel("Symbol:"), 0, 0)
+        symbol_label = QLabel("Symbol:")
+        symbol_label.setToolTip("Standard particle symbol (e.g., p for proton)")
+        name_layout.addWidget(symbol_label, 0, 0)
         self.symbol_edit = QLineEdit()
+        self.symbol_edit.setToolTip("Enter the particle symbol (optional but recommended)")
         self.symbol_edit.setPlaceholderText("e.g., p, n, π⁺")
         self.symbol_edit.textChanged.connect(self.update_preview)
         name_layout.addWidget(self.symbol_edit, 0, 1)
 
-        name_layout.addWidget(QLabel("Name:"), 1, 0)
+        name_label = QLabel("Name:")
+        name_label.setToolTip("Full particle name")
+        name_layout.addWidget(name_label, 1, 0)
         self.name_edit = QLineEdit()
+        self.name_edit.setToolTip("Enter the particle's full name (required)")
         self.name_edit.setPlaceholderText("e.g., Proton, Neutron")
         self.name_edit.textChanged.connect(self.update_preview)
         name_layout.addWidget(self.name_edit, 1, 1)
 
         # Spin alignment
         self.spin_aligned = QCheckBox("Spins aligned (higher spin state)")
+        self.spin_aligned.setToolTip(
+            "When checked, quark spins are aligned for a higher total spin.\n"
+            "Example: Delta baryons have aligned spins (spin 3/2)"
+        )
         self.spin_aligned.stateChanged.connect(self.update_preview)
         name_layout.addWidget(self.spin_aligned, 2, 0, 1, 2)
 
@@ -599,13 +629,19 @@ class MoleculeCreationDialog(QDialog):
         atom_group = QGroupBox("Add Atoms")
         atom_layout = QGridLayout(atom_group)
 
-        atom_layout.addWidget(QLabel("Element:"), 0, 0)
+        element_label = QLabel("Element:")
+        element_label.setToolTip("Select an element to add to the molecule")
+        atom_layout.addWidget(element_label, 0, 0)
         self.atom_combo = QComboBox()
+        self.atom_combo.setToolTip("Choose from available elements or type a symbol")
         self.atom_combo.setEditable(True)
         atom_layout.addWidget(self.atom_combo, 0, 1)
 
-        atom_layout.addWidget(QLabel("Count:"), 1, 0)
+        count_label = QLabel("Count:")
+        count_label.setToolTip("Number of atoms of this element in the molecule")
+        atom_layout.addWidget(count_label, 1, 0)
         self.count_spin = QSpinBox()
+        self.count_spin.setToolTip("How many atoms of this element to add (1-100)")
         self.count_spin.setRange(1, 100)
         self.count_spin.setValue(1)
         atom_layout.addWidget(self.count_spin, 1, 1)
@@ -653,8 +689,11 @@ class MoleculeCreationDialog(QDialog):
         name_group = QGroupBox("Molecule Identity")
         name_layout = QGridLayout(name_group)
 
-        name_layout.addWidget(QLabel("Name:"), 0, 0)
+        name_label = QLabel("Name:")
+        name_label.setToolTip("A descriptive name for the molecule")
+        name_layout.addWidget(name_label, 0, 0)
         self.name_edit = QLineEdit()
+        self.name_edit.setToolTip("Enter a common or IUPAC name for the molecule (required)")
         self.name_edit.setPlaceholderText("e.g., Water, Methane")
         self.name_edit.textChanged.connect(self.update_preview)
         name_layout.addWidget(self.name_edit, 0, 1)
@@ -829,6 +868,10 @@ Dipole Moment: {molecule_data['DipoleMoment_D']:.2f} D
     def create_molecule(self):
         if not self.name_edit.text():
             QMessageBox.warning(self, "Missing Name", "Please enter a molecule name.")
+            return
+
+        if not self.composition:
+            QMessageBox.warning(self, "No Atoms", "Please add at least one atom to the molecule composition.")
             return
 
         self._current_data['Name'] = self.name_edit.text()

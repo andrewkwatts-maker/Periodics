@@ -1302,8 +1302,8 @@ class AtomCalculatorV2:
         return None
 
     @classmethod
-    def _get_group(cls, Z: int, block: str, period: int) -> Optional[int]:
-        """Get group number from Z, block, and period."""
+    def _get_group_from_block(cls, Z: int, block: str, period: int) -> Optional[int]:
+        """Get group number from Z, block, and period (alternative method)."""
         if block == 's':
             if Z in [1, 3, 11, 19, 37, 55, 87]:
                 return 1

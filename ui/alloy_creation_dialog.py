@@ -55,8 +55,11 @@ class AlloyCreationDialog(QDialog):
         add_group.setStyleSheet(self._get_group_style())
         add_layout = QGridLayout(add_group)
 
-        add_layout.addWidget(QLabel("Element:"), 0, 0)
+        element_label = QLabel("Element:")
+        element_label.setToolTip("Select the element to add to the alloy composition")
+        add_layout.addWidget(element_label, 0, 0)
         self.element_combo = QComboBox()
+        self.element_combo.setToolTip("Choose from common alloying elements or type a custom symbol")
         # Add common alloying elements
         elements = ['Fe', 'Al', 'Cu', 'Ni', 'Cr', 'Ti', 'Zn', 'Sn', 'Mn', 'Mo',
                    'W', 'V', 'Co', 'Nb', 'Si', 'C', 'N', 'P', 'S', 'Ag', 'Au', 'Pb', 'Mg', 'B']
@@ -65,8 +68,11 @@ class AlloyCreationDialog(QDialog):
         self.element_combo.setEditable(True)
         add_layout.addWidget(self.element_combo, 0, 1)
 
-        add_layout.addWidget(QLabel("Weight %:"), 1, 0)
+        weight_label = QLabel("Weight %:")
+        weight_label.setToolTip("Weight percentage of this element in the alloy (0.001% - 100%)")
+        add_layout.addWidget(weight_label, 1, 0)
         self.percent_spin = QDoubleSpinBox()
+        self.percent_spin.setToolTip("Enter the weight percentage for this element")
         self.percent_spin.setRange(0.001, 100.0)
         self.percent_spin.setDecimals(3)
         self.percent_spin.setValue(1.0)
@@ -141,14 +147,26 @@ class AlloyCreationDialog(QDialog):
         settings_group.setStyleSheet(self._get_group_style())
         settings_layout = QGridLayout(settings_group)
 
-        settings_layout.addWidget(QLabel("Name:"), 0, 0)
+        name_label = QLabel("Name:")
+        name_label.setToolTip("A unique name to identify your custom alloy")
+        settings_layout.addWidget(name_label, 0, 0)
         self.name_edit = QLineEdit()
+        self.name_edit.setToolTip("Enter a descriptive name for the alloy (required)")
         self.name_edit.setPlaceholderText("e.g., Custom Steel Alloy")
         self.name_edit.textChanged.connect(self.update_preview)
         settings_layout.addWidget(self.name_edit, 0, 1)
 
-        settings_layout.addWidget(QLabel("Crystal Structure:"), 1, 0)
+        structure_label = QLabel("Crystal Structure:")
+        structure_label.setToolTip("The primary crystal lattice structure of the alloy")
+        settings_layout.addWidget(structure_label, 1, 0)
         self.structure_combo = QComboBox()
+        self.structure_combo.setToolTip(
+            "FCC: Face-Centered Cubic (e.g., aluminum, copper)\n"
+            "BCC: Body-Centered Cubic (e.g., iron, chromium)\n"
+            "HCP: Hexagonal Close-Packed (e.g., titanium, zinc)\n"
+            "BCT: Body-Centered Tetragonal\n"
+            "Mixed: Multiple crystal structures present"
+        )
         self.structure_combo.addItems(['FCC', 'BCC', 'HCP', 'BCT', 'Mixed'])
         self.structure_combo.currentIndexChanged.connect(self.update_preview)
         settings_layout.addWidget(self.structure_combo, 1, 1)
@@ -396,6 +414,24 @@ Category: {alloy_data['Category']}
         if not self.name_edit.text():
             QMessageBox.warning(self, "Missing Name", "Please enter an alloy name.")
             return
+
+        if not self.components:
+            QMessageBox.warning(self, "No Components", "Please add at least one element to the alloy composition.")
+            return
+
+        # Validate weight fractions sum to approximately 100%
+        total = sum(c['Percent'] for c in self.components)
+        if abs(total - 100.0) > 1.0:
+            reply = QMessageBox.question(
+                self, "Weight Percentage Warning",
+                f"The total weight percentage is {total:.3f}%, which differs from 100%.\n\n"
+                "Would you like to continue anyway, or go back and adjust the composition?\n\n"
+                "(Note: Small deviations may be acceptable for trace elements)",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
 
         # Update name in data
         self._current_data['Name'] = self.name_edit.text()
