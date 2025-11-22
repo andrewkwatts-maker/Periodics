@@ -67,6 +67,15 @@ class AlloyUnifiedTable(QWidget):
         self.pan_y = 0
         self.scroll_offset_y = 0
 
+        # Visual property encoding settings
+        self.fill_property = "Density"
+        self.border_color_property = "Melting Point"
+        self.glow_property = "Tensile Strength"
+        self.glow_intensity_property = "Corrosion Resistance"
+        self.symbol_text_color_property = "Young's Modulus"
+        self.border_size_property = "Hardness (Brinell)"
+        self.card_size_property = "Yield Strength"
+
         # Scatter plot settings
         self.scatter_x_property = 'density'
         self.scatter_y_property = 'tensile_strength'
@@ -411,7 +420,7 @@ class AlloyUnifiedTable(QWidget):
             painter.drawText(int(x + size + 5), int(y + size/2 + 5), name)
 
     def _draw_alloy_card(self, painter, alloy):
-        """Draw a single alloy card"""
+        """Draw a single alloy card with visual property encoding"""
         x = alloy.get('x', 0)
         y = alloy.get('y', 0)
         width = alloy.get('width', 160)
@@ -420,40 +429,91 @@ class AlloyUnifiedTable(QWidget):
         is_hovered = alloy == self.hovered_alloy
         is_selected = alloy == self.selected_alloy
 
+        # Get visual encoding colors
+        fill_value = self.get_normalized_property_value(alloy, self.fill_property)
+        border_value = self.get_normalized_property_value(alloy, self.border_color_property)
+        glow_value = self.get_normalized_property_value(alloy, self.glow_property)
+        glow_intensity = self.get_normalized_property_value(alloy, self.glow_intensity_property)
+
+        # Get custom gradient colors if set
+        fill_start, fill_end = (QColor(64, 128, 255), QColor(255, 128, 64))
+        border_start, border_end = (QColor(100, 100, 150), QColor(255, 200, 100))
+        glow_start, glow_end = (QColor(80, 80, 200), QColor(255, 100, 100))
+
+        if hasattr(self, 'gradient_colors'):
+            if 'fill_color' in self.gradient_colors:
+                fill_start, fill_end = self.gradient_colors['fill_color']
+            if 'border_color' in self.gradient_colors:
+                border_start, border_end = self.gradient_colors['border_color']
+            if 'glow_color' in self.gradient_colors:
+                glow_start, glow_end = self.gradient_colors['glow_color']
+
+        # Compute encoded colors
+        fill_color = self.get_color_from_gradient(fill_value, fill_start, fill_end)
+        border_color = self.get_color_from_gradient(border_value, border_start, border_end)
+        glow_color = self.get_color_from_gradient(glow_value, glow_start, glow_end)
+
+        # Get border size from encoding
+        border_size_value = self.get_normalized_property_value(alloy, self.border_size_property)
+        border_width = 1 + border_size_value * 4  # 1-5 pixels
+
         # Card background
         card_rect = QRectF(x, y, width, height)
 
-        # Get category color
+        # Get category color (fallback)
         category_color = QColor(AlloyCategory.get_color(alloy.get('category', 'Other')))
 
-        # Gradient background
+        # Draw glow effect based on glow intensity
+        if glow_intensity > 0.1 or is_hovered or is_selected:
+            glow_alpha = int(80 + glow_intensity * 120) if not (is_hovered or is_selected) else 150
+            glow_radius = 8 + glow_intensity * 12
+            glow_color_with_alpha = QColor(glow_color)
+            glow_color_with_alpha.setAlpha(glow_alpha)
+
+            glow_gradient = QRadialGradient(x + width/2, y + height/2, glow_radius + width/2)
+            glow_gradient.setColorAt(0, glow_color_with_alpha)
+            glow_gradient.setColorAt(0.5, QColor(glow_color.red(), glow_color.green(), glow_color.blue(), glow_alpha // 2))
+            glow_gradient.setColorAt(1, QColor(0, 0, 0, 0))
+
+            painter.setBrush(QBrush(glow_gradient))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawRoundedRect(QRectF(x - glow_radius, y - glow_radius,
+                                           width + 2*glow_radius, height + 2*glow_radius), 15, 15)
+
+        # Gradient background with fill color encoding
         gradient = QLinearGradient(x, y, x, y + height)
         if is_selected:
-            gradient.setColorAt(0, QColor(80, 80, 100, 230))
-            gradient.setColorAt(1, QColor(60, 60, 80, 230))
+            gradient.setColorAt(0, QColor(fill_color.red()//2 + 40, fill_color.green()//2 + 40,
+                                          fill_color.blue()//2 + 50, 230))
+            gradient.setColorAt(1, QColor(fill_color.red()//3 + 30, fill_color.green()//3 + 30,
+                                          fill_color.blue()//3 + 40, 230))
         elif is_hovered:
-            gradient.setColorAt(0, QColor(70, 70, 90, 210))
-            gradient.setColorAt(1, QColor(50, 50, 70, 210))
+            gradient.setColorAt(0, QColor(fill_color.red()//2 + 35, fill_color.green()//2 + 35,
+                                          fill_color.blue()//2 + 45, 210))
+            gradient.setColorAt(1, QColor(fill_color.red()//3 + 25, fill_color.green()//3 + 25,
+                                          fill_color.blue()//3 + 35, 210))
         else:
-            gradient.setColorAt(0, QColor(55, 55, 75, 190))
-            gradient.setColorAt(1, QColor(40, 40, 55, 190))
+            gradient.setColorAt(0, QColor(fill_color.red()//3 + 28, fill_color.green()//3 + 28,
+                                          fill_color.blue()//3 + 37, 190))
+            gradient.setColorAt(1, QColor(fill_color.red()//4 + 20, fill_color.green()//4 + 20,
+                                          fill_color.blue()//4 + 27, 190))
 
         painter.setBrush(QBrush(gradient))
 
-        # Border
+        # Border with encoded color and size
         if is_selected:
-            painter.setPen(QPen(category_color, 3))
+            painter.setPen(QPen(border_color.lighter(130), border_width + 2))
         elif is_hovered:
-            painter.setPen(QPen(category_color.lighter(120), 2))
+            painter.setPen(QPen(border_color.lighter(120), border_width + 1))
         else:
-            painter.setPen(QPen(category_color.darker(120), 1))
+            painter.setPen(QPen(border_color, border_width))
 
         painter.drawRoundedRect(card_rect, 10, 10)
 
         # Draw microstructure preview
         self._draw_microstructure_preview(painter, alloy, x + 10, y + 10, width - 20, 70)
 
-        # Draw alloy info
+        # Draw alloy info with encoded text colors
         self._draw_alloy_info(painter, alloy, x, y, width, height)
 
     def _draw_microstructure_preview(self, painter, alloy, x, y, width, height):
@@ -644,3 +704,124 @@ class AlloyUnifiedTable(QWidget):
             self.fade_values = {}
         self.fade_values[property_key] = fade_value
         self.update()
+
+    def set_visual_property(self, property_key, property_name):
+        """Set visual property mapping.
+
+        Args:
+            property_key: Visual element key (fill_color, border_color, etc.)
+            property_name: Property name to map to this visual element
+        """
+        attr_map = {
+            "fill_color": "fill_property",
+            "border_color": "border_color_property",
+            "glow_color": "glow_property",
+            "glow_intensity": "glow_intensity_property",
+            "symbol_text_color": "symbol_text_color_property",
+            "border_size": "border_size_property",
+            "card_size": "card_size_property"
+        }
+        attr_name = attr_map.get(property_key)
+        if attr_name:
+            setattr(self, attr_name, property_name)
+            self.update()
+
+    def get_normalized_property_value(self, alloy, property_name):
+        """Get normalized property value (0-1) for visual encoding.
+
+        Args:
+            alloy: Alloy data dictionary
+            property_name: Display name of the property
+
+        Returns:
+            Float value between 0 and 1
+        """
+        # Map display names to internal keys
+        property_key_map = {
+            "None": None,
+            "Density": "density",
+            "Melting Point": "melting_point",
+            "Thermal Conductivity": "thermal_conductivity",
+            "Thermal Expansion": "thermal_expansion",
+            "Electrical Resistivity": "electrical_resistivity",
+            "Specific Heat": "specific_heat",
+            "Tensile Strength": "tensile_strength",
+            "Yield Strength": "yield_strength",
+            "Fatigue Strength": "fatigue_strength",
+            "Hardness (Brinell)": "hardness_brinell",
+            "Hardness (Vickers)": "hardness_vickers",
+            "Hardness (Rockwell)": "hardness_rockwell",
+            "Elongation": "elongation",
+            "Reduction of Area": "reduction_of_area",
+            "Impact Strength": "impact_strength",
+            "Fracture Toughness": "fracture_toughness",
+            "Young's Modulus": "youngs_modulus",
+            "Shear Modulus": "shear_modulus",
+            "Poisson's Ratio": "poissons_ratio",
+            "Corrosion Resistance": "corrosion_resistance",
+            "PREN": "pren",
+            "Pitting Potential": "pitting_potential",
+            "Cost per kg": "cost_per_kg"
+        }
+
+        # Property ranges for normalization
+        property_ranges = {
+            "density": (1.0, 25.0),
+            "melting_point": (300, 4000),
+            "thermal_conductivity": (5, 500),
+            "thermal_expansion": (1e-6, 30e-6),
+            "electrical_resistivity": (1e-8, 1e-5),
+            "specific_heat": (100, 1500),
+            "tensile_strength": (50, 3000),
+            "yield_strength": (20, 2500),
+            "fatigue_strength": (50, 1500),
+            "hardness_brinell": (10, 800),
+            "hardness_vickers": (50, 2000),
+            "hardness_rockwell": (10, 70),
+            "elongation": (0, 80),
+            "reduction_of_area": (0, 90),
+            "impact_strength": (5, 300),
+            "fracture_toughness": (10, 200),
+            "youngs_modulus": (10, 500),
+            "shear_modulus": (10, 200),
+            "poissons_ratio": (0.2, 0.5),
+            "corrosion_resistance": (0, 100),
+            "pren": (0, 50),
+            "pitting_potential": (-500, 1000),
+            "cost_per_kg": (0.5, 1000)
+        }
+
+        key = property_key_map.get(property_name)
+        if key is None:
+            return 0.5  # Default middle value for "None"
+
+        value = alloy.get(key, 0)
+        min_val, max_val = property_ranges.get(key, (0, 100))
+
+        if max_val == min_val:
+            return 0.5
+
+        normalized = (value - min_val) / (max_val - min_val)
+        return max(0, min(1, normalized))
+
+    def get_color_from_gradient(self, normalized_value, start_color=None, end_color=None):
+        """Get interpolated color from gradient based on normalized value.
+
+        Args:
+            normalized_value: Value between 0 and 1
+            start_color: Start color (QColor), defaults to blue
+            end_color: End color (QColor), defaults to orange
+
+        Returns:
+            QColor interpolated between start and end
+        """
+        if start_color is None:
+            start_color = QColor(64, 128, 255)  # Blue
+        if end_color is None:
+            end_color = QColor(255, 128, 64)    # Orange
+
+        r = int(start_color.red() + (end_color.red() - start_color.red()) * normalized_value)
+        g = int(start_color.green() + (end_color.green() - start_color.green()) * normalized_value)
+        b = int(start_color.blue() + (end_color.blue() - start_color.blue()) * normalized_value)
+
+        return QColor(r, g, b)

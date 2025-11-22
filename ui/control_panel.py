@@ -279,6 +279,7 @@ class PropertyControl(QWidget):
         # Map property name to element field
         property_field_map = {
             "atomic_number": "z",
+            "atomic_mass": "atomic_mass",
             "ionization": "ie",
             "electronegativity": "electronegativity",
             "melting": "melting_point",
@@ -287,6 +288,11 @@ class PropertyControl(QWidget):
             "density": "density",
             "electron_affinity": "electron_affinity",
             "valence": "valence_electrons",
+            "group": "group",
+            "period": "period",
+            "specific_heat": "specific_heat",
+            "thermal_conductivity": "thermal_conductivity",
+            "electrical_conductivity": "electrical_conductivity",
             "wavelength": "wavelength_nm",
             "emission_wavelength": "emission_wavelength",
             "visible_emission_wavelength": "visible_emission_wavelength",
@@ -813,49 +819,49 @@ class ControlPanel(QWidget):
         size_properties = [PTPropertyName.get_display_name(prop) for prop in PTPropertyName.get_size_properties()]
         intensity_properties = [PTPropertyName.get_display_name(prop) for prop in PTPropertyName.get_intensity_properties()]
 
-        # 1. Fill Colour -> Emission Wavelength
-        self.fill_color_control = PropertyControl("Fill Colour", "fill_color", self, color_properties, control_type="color", default_index=10)
-        self.fill_color_control.property_combo.setCurrentIndex(10)  # Emission Wavelength
+        # 1. Fill Colour -> Emission Wavelength (index 16 in updated color_properties)
+        self.fill_color_control = PropertyControl("Fill Colour", "fill_color", self, color_properties, control_type="color", default_index=16)
+        self.fill_color_control.property_combo.setCurrentIndex(16)  # Emission Wavelength
         properties_layout.addWidget(self.fill_color_control)
 
-        # 2. Border Colour -> Electron Affinity
-        self.border_color_control = PropertyControl("Border Colour", "border_color", self, color_properties, control_type="color", default_index=7)
-        self.border_color_control.property_combo.setCurrentIndex(7)  # Electron Affinity
+        # 2. Border Colour -> Electron Affinity (index 8 in updated color_properties)
+        self.border_color_control = PropertyControl("Border Colour", "border_color", self, color_properties, control_type="color", default_index=8)
+        self.border_color_control.property_combo.setCurrentIndex(8)  # Electron Affinity
         properties_layout.addWidget(self.border_color_control)
 
-        # 3. Border Size -> Valence Electrons
-        self.border_size_control = PropertyControl("Border Size", "border_size", self, size_properties, control_type="size", default_index=8)
-        self.border_size_control.property_combo.setCurrentIndex(8)  # Valence Electrons
+        # 3. Border Size -> Valence Electrons (index 9 in updated size_properties)
+        self.border_size_control = PropertyControl("Border Size", "border_size", self, size_properties, control_type="size", default_index=9)
+        self.border_size_control.property_combo.setCurrentIndex(9)  # Valence Electrons
         properties_layout.addWidget(self.border_size_control)
 
-        # 4. Inner Ring Colour -> Orbital Block
-        self.ring_color_control = PropertyControl("Inner Ring Colour", "ring_color", self, color_properties, control_type="color", default_index=9)
-        self.ring_color_control.property_combo.setCurrentIndex(9)  # Orbital Block
+        # 4. Inner Ring Colour -> Orbital Block (index 12 in updated color_properties)
+        self.ring_color_control = PropertyControl("Inner Ring Colour", "ring_color", self, color_properties, control_type="color", default_index=12)
+        self.ring_color_control.property_combo.setCurrentIndex(12)  # Orbital Block
         properties_layout.addWidget(self.ring_color_control)
 
-        # 5. Inner Ring Size -> Electronegativity
-        self.ring_size_control = PropertyControl("Inner Ring Size", "ring_size", self, size_properties, control_type="size", default_index=3)
-        self.ring_size_control.property_combo.setCurrentIndex(3)  # Electronegativity
+        # 5. Inner Ring Size -> Electronegativity (index 4 in updated size_properties)
+        self.ring_size_control = PropertyControl("Inner Ring Size", "ring_size", self, size_properties, control_type="size", default_index=4)
+        self.ring_size_control.property_combo.setCurrentIndex(4)  # Electronegativity
         properties_layout.addWidget(self.ring_size_control)
 
-        # 6. Glow Colour -> Atomic Radius
-        self.glow_color_control = PropertyControl("Glow Colour", "glow_color", self, color_properties, control_type="color", default_index=5)
-        self.glow_color_control.property_combo.setCurrentIndex(5)  # Atomic Radius
+        # 6. Glow Colour -> Atomic Radius (index 6 in updated color_properties)
+        self.glow_color_control = PropertyControl("Glow Colour", "glow_color", self, color_properties, control_type="color", default_index=6)
+        self.glow_color_control.property_combo.setCurrentIndex(6)  # Atomic Radius
         properties_layout.addWidget(self.glow_color_control)
 
-        # 7. Glow Radius/Intensity -> Ionization Energy
-        self.glow_intensity_control = PropertyControl("Glow Radius/Intensity", "glow_intensity", self, intensity_properties, control_type="intensity", default_index=2)
-        self.glow_intensity_control.property_combo.setCurrentIndex(2)  # Ionization Energy
+        # 7. Glow Radius/Intensity -> Ionization Energy (index 3 in updated intensity_properties)
+        self.glow_intensity_control = PropertyControl("Glow Radius/Intensity", "glow_intensity", self, intensity_properties, control_type="intensity", default_index=3)
+        self.glow_intensity_control.property_combo.setCurrentIndex(3)  # Ionization Energy
         properties_layout.addWidget(self.glow_intensity_control)
 
-        # 8. Symbol Text Colour -> Melting Point (NEW)
-        self.symbol_text_color_control = PropertyControl("Symbol Text Colour", "symbol_text_color", self, color_properties, control_type="color", default_index=3)
-        self.symbol_text_color_control.property_combo.setCurrentIndex(3)  # Melting Point
+        # 8. Symbol Text Colour -> Melting Point (index 4 in updated color_properties)
+        self.symbol_text_color_control = PropertyControl("Symbol Text Colour", "symbol_text_color", self, color_properties, control_type="color", default_index=4)
+        self.symbol_text_color_control.property_combo.setCurrentIndex(4)  # Melting Point
         properties_layout.addWidget(self.symbol_text_color_control)
 
-        # 9. Atomic Number Text Colour -> Boiling Point (NEW)
-        self.atomic_number_text_color_control = PropertyControl("Atomic Number Text Colour", "atomic_number_text_color", self, color_properties, control_type="color", default_index=4)
-        self.atomic_number_text_color_control.property_combo.setCurrentIndex(4)  # Boiling Point
+        # 9. Atomic Number Text Colour -> Boiling Point (index 5 in updated color_properties)
+        self.atomic_number_text_color_control = PropertyControl("Atomic Number Text Colour", "atomic_number_text_color", self, color_properties, control_type="color", default_index=5)
+        self.atomic_number_text_color_control.property_combo.setCurrentIndex(5)  # Boiling Point
         properties_layout.addWidget(self.atomic_number_text_color_control)
 
         # Isotope layers toggle
@@ -1581,35 +1587,32 @@ class ControlPanel(QWidget):
 
     def reset_property_mappings(self):
         """Reset all property controls to their default mappings"""
-        # 1. Fill Colour -> Emission Wavelength
-        self.fill_color_control.property_combo.setCurrentIndex(10)
+        # 1. Fill Colour -> Emission Wavelength (index 16)
+        self.fill_color_control.property_combo.setCurrentIndex(16)
 
-        # 2. Border Colour -> Electron Affinity
-        self.border_color_control.property_combo.setCurrentIndex(7)
+        # 2. Border Colour -> Electron Affinity (index 8)
+        self.border_color_control.property_combo.setCurrentIndex(8)
 
-        # 3. Border Size -> Valence Electrons
-        self.border_size_control.property_combo.setCurrentIndex(8)
+        # 3. Border Size -> Valence Electrons (index 9)
+        self.border_size_control.property_combo.setCurrentIndex(9)
 
-        # 4. Inner Ring Colour -> Orbital Block
-        self.ring_color_control.property_combo.setCurrentIndex(9)
+        # 4. Inner Ring Colour -> Orbital Block (index 12)
+        self.ring_color_control.property_combo.setCurrentIndex(12)
 
-        # 5. Inner Ring Size -> Electronegativity
-        self.ring_size_control.property_combo.setCurrentIndex(3)
+        # 5. Inner Ring Size -> Electronegativity (index 4)
+        self.ring_size_control.property_combo.setCurrentIndex(4)
 
-        # 6. Glow Colour -> Atomic Radius
-        self.glow_color_control.property_combo.setCurrentIndex(5)
+        # 6. Glow Colour -> Atomic Radius (index 6)
+        self.glow_color_control.property_combo.setCurrentIndex(6)
 
-        # 7. Glow Radius/Intensity -> Ionization Energy
-        self.glow_intensity_control.property_combo.setCurrentIndex(2)
+        # 7. Glow Radius/Intensity -> Ionization Energy (index 3)
+        self.glow_intensity_control.property_combo.setCurrentIndex(3)
 
-        # 8. Symbol Text Colour -> Melting Point
-        self.symbol_text_color_control.property_combo.setCurrentIndex(3)
+        # 8. Symbol Text Colour -> Melting Point (index 4)
+        self.symbol_text_color_control.property_combo.setCurrentIndex(4)
 
-        # 9. Atomic Number Text Colour -> Boiling Point
-        self.atomic_number_text_color_control.property_combo.setCurrentIndex(4)
-
-        # Reset fade slider
-        self.property_fade_slider.setValue(0)
+        # 9. Atomic Number Text Colour -> Boiling Point (index 5)
+        self.atomic_number_text_color_control.property_combo.setCurrentIndex(5)
 
         self.table.update()
 

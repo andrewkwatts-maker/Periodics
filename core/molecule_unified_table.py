@@ -816,6 +816,94 @@ class MoleculeUnifiedTable(QWidget):
         self.fade_values[property_key] = fade
         self.update()
 
+    def set_card_size_mapping(self, property_name):
+        """Set the property used for card size scaling.
+
+        Args:
+            property_name: Name of the property to map to card size
+        """
+        if not hasattr(self, 'card_size_property'):
+            self.card_size_property = None
+        self.card_size_property = property_name
+        self._update_layout()
+        self.update()
+
+    def set_glow_intensity_mapping(self, property_name):
+        """Set the property used for glow intensity.
+
+        Args:
+            property_name: Name of the property to map to glow intensity
+        """
+        if not hasattr(self, 'glow_intensity_property'):
+            self.glow_intensity_property = None
+        self.glow_intensity_property = property_name
+        self.update()
+
+    def set_opacity_mapping(self, property_name):
+        """Set the property used for card opacity.
+
+        Args:
+            property_name: Name of the property to map to opacity
+        """
+        if not hasattr(self, 'opacity_property'):
+            self.opacity_property = None
+        self.opacity_property = property_name
+        self.update()
+
+    def get_molecule_property_value(self, mol, property_name):
+        """Get a property value from a molecule, including derived properties.
+
+        Args:
+            mol: Molecule dictionary
+            property_name: Name of the property to retrieve
+
+        Returns:
+            The property value or None if not found
+        """
+        # Handle derived properties
+        if property_name == 'num_atoms':
+            composition = mol.get('Composition', [])
+            return sum(c.get('Count', 1) for c in composition)
+        elif property_name == 'num_bonds':
+            bonds = mol.get('Bonds', [])
+            return len(bonds)
+        elif property_name == 'bond_length_avg':
+            bonds = mol.get('Bonds', [])
+            if bonds:
+                lengths = [b.get('Length_pm', 0) for b in bonds if b.get('Length_pm')]
+                return sum(lengths) / len(lengths) if lengths else 0
+            return 0
+        elif property_name == 'electronegativity_diff':
+            # Calculate based on molecule polarity/bond type
+            polarity = mol.get('polarity', '')
+            if polarity == 'Ionic':
+                return 2.5
+            elif polarity == 'Polar':
+                return 1.5
+            else:
+                return 0.5
+
+        # Map property names to JSON keys
+        property_mapping = {
+            'molecular_mass': ['mass', 'MolecularMass_amu', 'MolecularMass_g_mol'],
+            'density': ['density', 'Density_g_cm3'],
+            'melting_point': ['melting_point', 'MeltingPoint_K'],
+            'boiling_point': ['boiling_point', 'BoilingPoint_K'],
+            'bond_angle': ['bond_angle', 'BondAngle_deg'],
+            'dipole_moment': ['dipole_moment', 'DipoleMoment_D'],
+            'vapor_pressure': ['vapor_pressure', 'VaporPressure_kPa'],
+            'solubility': ['solubility', 'Solubility_g_L'],
+        }
+
+        # Try mapped keys first
+        if property_name in property_mapping:
+            for key in property_mapping[property_name]:
+                if key in mol:
+                    return mol[key]
+
+        # Try direct key lookup
+        return mol.get(property_name)
+
     def reload_data(self):
         """Reload molecule data from files and refresh the display"""
         self.base_molecules = self.loader.load_all_molecules()

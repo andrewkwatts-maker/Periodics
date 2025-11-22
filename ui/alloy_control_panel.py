@@ -232,19 +232,41 @@ class AlloyPropertyControl(QWidget):
 
     def _get_property_metadata(self, property_name):
         """Get min/max/unit metadata for alloy properties"""
-        # Property metadata for alloy properties
+        # Comprehensive property metadata for alloy properties
         metadata = {
             "None": {"min": 0, "max": 100, "unit": ""},
+            # Physical Properties
             "Density": {"min": 1.0, "max": 25.0, "unit": "g/cm3"},
             "Melting Point": {"min": 300, "max": 4000, "unit": "K"},
             "Thermal Conductivity": {"min": 5, "max": 500, "unit": "W/m-K"},
-            "Electrical Resistivity": {"min": 1e-8, "max": 1e-5, "unit": "ohm-m"},
+            "Thermal Expansion": {"min": 1e-6, "max": 30e-6, "unit": "1/K"},
+            "Electrical Resistivity": {"min": 1e-8, "max": 1e-5, "unit": "Ohm-m"},
             "Specific Heat": {"min": 100, "max": 1500, "unit": "J/kg-K"},
+            # Mechanical Properties - Strength
             "Tensile Strength": {"min": 50, "max": 3000, "unit": "MPa"},
             "Yield Strength": {"min": 20, "max": 2500, "unit": "MPa"},
+            "Fatigue Strength": {"min": 50, "max": 1500, "unit": "MPa"},
+            # Mechanical Properties - Hardness
             "Hardness": {"min": 10, "max": 800, "unit": "HB"},
+            "Hardness (Brinell)": {"min": 10, "max": 800, "unit": "HB"},
+            "Hardness (Vickers)": {"min": 50, "max": 2000, "unit": "HV"},
+            "Hardness (Rockwell)": {"min": 10, "max": 70, "unit": "HRC"},
+            # Mechanical Properties - Ductility
             "Elongation": {"min": 0, "max": 80, "unit": "%"},
+            "Reduction of Area": {"min": 0, "max": 90, "unit": "%"},
+            "Impact Strength": {"min": 5, "max": 300, "unit": "J"},
+            "Fracture Toughness": {"min": 10, "max": 200, "unit": "MPa-m^0.5"},
+            # Mechanical Properties - Stiffness
             "Young's Modulus": {"min": 10, "max": 500, "unit": "GPa"},
+            "Shear Modulus": {"min": 10, "max": 200, "unit": "GPa"},
+            "Poisson's Ratio": {"min": 0.2, "max": 0.5, "unit": ""},
+            # Corrosion Properties
+            "Corrosion Resistance": {"min": 0, "max": 100, "unit": ""},
+            "PREN": {"min": 0, "max": 50, "unit": ""},
+            "Pitting Potential": {"min": -500, "max": 1000, "unit": "mV"},
+            # Economic Properties
+            "Cost per kg": {"min": 0.5, "max": 1000, "unit": "$/kg"},
+            # Lattice Properties
             "Lattice Parameter": {"min": 200, "max": 500, "unit": "pm"},
             "Packing Factor": {"min": 0.5, "max": 0.8, "unit": ""},
         }
@@ -509,16 +531,41 @@ class AlloyControlPanel(QWidget):
         """Create visual property encodings with expandable controls"""
         collapsible = CollapsibleBox("Visual Property Encodings", "#B08264")
 
-        # Available property options for alloys
+        # Comprehensive property options for alloys - matching element tab feature set
         color_properties = [
-            "None", "Density", "Melting Point", "Thermal Conductivity",
-            "Tensile Strength", "Yield Strength", "Hardness",
-            "Young's Modulus", "Elongation", "Electrical Resistivity"
+            "None",
+            # Physical Properties
+            "Density", "Melting Point", "Thermal Conductivity", "Thermal Expansion",
+            "Electrical Resistivity", "Specific Heat",
+            # Mechanical Properties - Strength
+            "Tensile Strength", "Yield Strength", "Fatigue Strength",
+            # Mechanical Properties - Hardness
+            "Hardness (Brinell)", "Hardness (Vickers)", "Hardness (Rockwell)",
+            # Mechanical Properties - Ductility
+            "Elongation", "Reduction of Area", "Impact Strength", "Fracture Toughness",
+            # Mechanical Properties - Stiffness
+            "Young's Modulus", "Shear Modulus", "Poisson's Ratio",
+            # Corrosion Properties
+            "Corrosion Resistance", "PREN", "Pitting Potential",
+            # Economic Properties
+            "Cost per kg"
         ]
 
         size_properties = [
-            "None", "Density", "Hardness", "Tensile Strength",
-            "Young's Modulus", "Melting Point", "Elongation"
+            "None",
+            "Density", "Hardness (Brinell)", "Hardness (Vickers)",
+            "Tensile Strength", "Yield Strength",
+            "Young's Modulus", "Shear Modulus", "Melting Point",
+            "Elongation", "Impact Strength", "Fracture Toughness",
+            "PREN", "Cost per kg"
+        ]
+
+        intensity_properties = [
+            "None",
+            "Tensile Strength", "Yield Strength", "Hardness (Brinell)",
+            "Melting Point", "Thermal Conductivity",
+            "Corrosion Resistance", "PREN",
+            "Fatigue Strength", "Fracture Toughness", "Cost per kg"
         ]
 
         # 1. Fill Colour -> Density
@@ -540,26 +587,42 @@ class AlloyControlPanel(QWidget):
         # 3. Glow Colour -> Tensile Strength
         self.glow_color_control = AlloyPropertyControl(
             "Glow Colour", "glow_color", self, color_properties,
-            control_type="color", default_index=4  # Tensile Strength
+            control_type="color", default_index=7  # Tensile Strength
         )
-        self.glow_color_control.property_combo.setCurrentIndex(4)
+        self.glow_color_control.property_combo.setCurrentIndex(7)
         collapsible.content_layout.addWidget(self.glow_color_control)
 
-        # 4. Symbol Text Colour -> Young's Modulus
+        # 4. Glow Intensity -> Corrosion Resistance (NEW)
+        self.glow_intensity_control = AlloyPropertyControl(
+            "Glow Intensity", "glow_intensity", self, intensity_properties,
+            control_type="size", default_index=6  # Corrosion Resistance
+        )
+        self.glow_intensity_control.property_combo.setCurrentIndex(6)
+        collapsible.content_layout.addWidget(self.glow_intensity_control)
+
+        # 5. Symbol Text Colour -> Young's Modulus
         self.symbol_text_color_control = AlloyPropertyControl(
             "Symbol Text Colour", "symbol_text_color", self, color_properties,
-            control_type="color", default_index=7  # Young's Modulus
+            control_type="color", default_index=17  # Young's Modulus
         )
-        self.symbol_text_color_control.property_combo.setCurrentIndex(7)
+        self.symbol_text_color_control.property_combo.setCurrentIndex(17)
         collapsible.content_layout.addWidget(self.symbol_text_color_control)
 
-        # 5. Border Size -> Hardness (Brinell)
+        # 6. Border Size -> Hardness (Brinell)
         self.border_size_control = AlloyPropertyControl(
             "Border Size", "border_size", self, size_properties,
-            control_type="size", default_index=2  # Hardness
+            control_type="size", default_index=2  # Hardness (Brinell)
         )
         self.border_size_control.property_combo.setCurrentIndex(2)
         collapsible.content_layout.addWidget(self.border_size_control)
+
+        # 7. Card Size -> Yield Strength (NEW)
+        self.card_size_control = AlloyPropertyControl(
+            "Card Size", "card_size", self, size_properties,
+            control_type="size", default_index=4  # Yield Strength
+        )
+        self.card_size_control.property_combo.setCurrentIndex(4)
+        collapsible.content_layout.addWidget(self.card_size_control)
 
         # Reset button to restore default mappings
         reset_button = QPushButton("Reset Property Mappings")
@@ -944,8 +1007,10 @@ class AlloyControlPanel(QWidget):
                 "fill_color": "fill_property",
                 "border_color": "border_color_property",
                 "glow_color": "glow_property",
+                "glow_intensity": "glow_intensity_property",
                 "symbol_text_color": "symbol_text_color_property",
-                "border_size": "border_size_property"
+                "border_size": "border_size_property",
+                "card_size": "card_size_property"
             }
             attr_name = property_map.get(property_key)
             if attr_name:
@@ -976,20 +1041,26 @@ class AlloyControlPanel(QWidget):
 
     def reset_property_mappings(self):
         """Reset all property controls to their default mappings"""
-        # Reset fill color
-        self.fill_color_control.property_combo.setCurrentIndex(1)  # Density
+        # Reset fill color -> Density
+        self.fill_color_control.property_combo.setCurrentIndex(1)
 
-        # Reset border color
-        self.border_color_control.property_combo.setCurrentIndex(2)  # Melting Point
+        # Reset border color -> Melting Point
+        self.border_color_control.property_combo.setCurrentIndex(2)
 
-        # Reset glow color
-        self.glow_color_control.property_combo.setCurrentIndex(4)  # Tensile Strength
+        # Reset glow color -> Tensile Strength
+        self.glow_color_control.property_combo.setCurrentIndex(7)
 
-        # Reset symbol text color
-        self.symbol_text_color_control.property_combo.setCurrentIndex(7)  # Young's Modulus
+        # Reset glow intensity -> Corrosion Resistance
+        self.glow_intensity_control.property_combo.setCurrentIndex(6)
 
-        # Reset border size
-        self.border_size_control.property_combo.setCurrentIndex(2)  # Hardness
+        # Reset symbol text color -> Young's Modulus
+        self.symbol_text_color_control.property_combo.setCurrentIndex(17)
+
+        # Reset border size -> Hardness (Brinell)
+        self.border_size_control.property_combo.setCurrentIndex(2)
+
+        # Reset card size -> Yield Strength
+        self.card_size_control.property_combo.setCurrentIndex(4)
 
         self.table.update()
 

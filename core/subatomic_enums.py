@@ -110,15 +110,24 @@ class ParticleCategory(Enum):
 class SubatomicProperty(Enum):
     """Properties of subatomic particles that can be visualized"""
     MASS = "mass"
+    MASS_LOG = "mass_log"  # Log scale for wide mass range
     CHARGE = "charge"
     SPIN = "spin"
     HALF_LIFE = "half_life"
+    HALF_LIFE_LOG = "half_life_log"  # Log scale for lifetime
+    MEAN_LIFETIME = "mean_lifetime"
+    MEAN_LIFETIME_LOG = "mean_lifetime_log"
+    DECAY_WIDTH = "decay_width"
     STABILITY = "stability"
     BARYON_NUMBER = "baryon_number"
     LEPTON_NUMBER = "lepton_number"
     STRANGENESS = "strangeness"
+    CHARM = "charm"
+    BOTTOMNESS = "bottomness"
     ISOSPIN = "isospin"
+    ISOSPIN_I3 = "isospin_i3"
     PARITY = "parity"
+    C_PARITY = "c_parity"
     QUARK_COUNT = "quark_count"
     NONE = "none"
 
@@ -130,15 +139,24 @@ class SubatomicProperty(Enum):
 
         display_names = {
             cls.MASS: "Mass (MeV/c^2)",
-            cls.CHARGE: "Electric Charge",
-            cls.SPIN: "Spin",
-            cls.HALF_LIFE: "Half-Life",
+            cls.MASS_LOG: "Mass (log scale)",
+            cls.CHARGE: "Electric Charge (e)",
+            cls.SPIN: "Spin (hbar)",
+            cls.HALF_LIFE: "Half-Life (s)",
+            cls.HALF_LIFE_LOG: "Half-Life (log)",
+            cls.MEAN_LIFETIME: "Mean Lifetime (s)",
+            cls.MEAN_LIFETIME_LOG: "Mean Lifetime (log)",
+            cls.DECAY_WIDTH: "Decay Width (MeV)",
             cls.STABILITY: "Stability",
-            cls.BARYON_NUMBER: "Baryon Number",
-            cls.LEPTON_NUMBER: "Lepton Number",
-            cls.STRANGENESS: "Strangeness",
-            cls.ISOSPIN: "Isospin",
-            cls.PARITY: "Parity",
+            cls.BARYON_NUMBER: "Baryon Number (B)",
+            cls.LEPTON_NUMBER: "Lepton Number (L)",
+            cls.STRANGENESS: "Strangeness (S)",
+            cls.CHARM: "Charm (C)",
+            cls.BOTTOMNESS: "Bottomness (B')",
+            cls.ISOSPIN: "Isospin (I)",
+            cls.ISOSPIN_I3: "Isospin I3",
+            cls.PARITY: "Parity (P)",
+            cls.C_PARITY: "C-Parity",
             cls.QUARK_COUNT: "Quark Count",
             cls.NONE: "None"
         }
@@ -153,15 +171,89 @@ class SubatomicProperty(Enum):
         return cls.NONE
 
     @classmethod
+    def get_json_key(cls, prop):
+        """Get JSON data key for property"""
+        if isinstance(prop, str):
+            prop = cls.from_string(prop)
+        keys = {
+            cls.MASS: "Mass_MeVc2",
+            cls.MASS_LOG: "Mass_MeVc2",
+            cls.CHARGE: "Charge_e",
+            cls.SPIN: "Spin_hbar",
+            cls.HALF_LIFE: "HalfLife_s",
+            cls.HALF_LIFE_LOG: "HalfLife_s",
+            cls.MEAN_LIFETIME: "MeanLifetime_s",
+            cls.MEAN_LIFETIME_LOG: "MeanLifetime_s",
+            cls.DECAY_WIDTH: "Width_MeV",
+            cls.STABILITY: "Stability",
+            cls.BARYON_NUMBER: "BaryonNumber_B",
+            cls.LEPTON_NUMBER: "LeptonNumber_L",
+            cls.STRANGENESS: "Strangeness",
+            cls.CHARM: "Charm",
+            cls.BOTTOMNESS: "Bottomness",
+            cls.ISOSPIN: "Isospin_I",
+            cls.ISOSPIN_I3: "Isospin_I3",
+            cls.PARITY: "Parity_P",
+            cls.C_PARITY: "CParity",
+            cls.QUARK_COUNT: "quark_count",  # Computed property
+            cls.NONE: None
+        }
+        return keys.get(prop, None)
+
+    @classmethod
+    def get_property_range(cls, prop):
+        """Get default min/max range for a property"""
+        if isinstance(prop, str):
+            prop = cls.from_string(prop)
+        ranges = {
+            cls.MASS: (0.0, 12000.0),  # Pion to Upsilon (MeV/c^2)
+            cls.MASS_LOG: (2.0, 4.5),  # Log10 scale
+            cls.CHARGE: (-2.0, 2.0),  # In units of e
+            cls.SPIN: (0.0, 3.5),  # In units of hbar
+            cls.HALF_LIFE: (0.0, 1e-8),  # In seconds
+            cls.HALF_LIFE_LOG: (-25, -5),  # Log10 scale
+            cls.MEAN_LIFETIME: (0.0, 1e-8),  # In seconds
+            cls.MEAN_LIFETIME_LOG: (-25, -5),  # Log10 scale
+            cls.DECAY_WIDTH: (0.0, 200.0),  # In MeV
+            cls.STABILITY: (0, 1),  # Binary stable/unstable
+            cls.BARYON_NUMBER: (-1, 1),
+            cls.LEPTON_NUMBER: (-1, 1),
+            cls.STRANGENESS: (-3, 0),
+            cls.CHARM: (-2, 2),
+            cls.BOTTOMNESS: (-1, 1),
+            cls.ISOSPIN: (0.0, 1.5),
+            cls.ISOSPIN_I3: (-1.5, 1.5),
+            cls.PARITY: (-1, 1),
+            cls.C_PARITY: (-1, 1),
+            cls.QUARK_COUNT: (2, 3),  # Mesons have 2, baryons have 3
+            cls.NONE: (0, 100)
+        }
+        return ranges.get(prop, (0, 100))
+
+    @classmethod
+    def is_log_scale(cls, prop):
+        """Check if property should use log scale"""
+        if isinstance(prop, str):
+            prop = cls.from_string(prop)
+        return prop in [cls.MASS_LOG, cls.HALF_LIFE_LOG, cls.MEAN_LIFETIME_LOG]
+
+    @classmethod
     def get_color_properties(cls):
         """Get list of properties suitable for color encoding"""
         return [
             cls.MASS,
+            cls.MASS_LOG,
             cls.CHARGE,
             cls.SPIN,
-            cls.HALF_LIFE,
+            cls.HALF_LIFE_LOG,
+            cls.MEAN_LIFETIME_LOG,
+            cls.DECAY_WIDTH,
             cls.STRANGENESS,
+            cls.CHARM,
+            cls.BOTTOMNESS,
             cls.ISOSPIN,
+            cls.ISOSPIN_I3,
+            cls.STABILITY,
             cls.NONE
         ]
 
@@ -170,9 +262,55 @@ class SubatomicProperty(Enum):
         """Get list of properties suitable for size encoding"""
         return [
             cls.MASS,
+            cls.MASS_LOG,
             cls.CHARGE,
             cls.SPIN,
             cls.QUARK_COUNT,
+            cls.ISOSPIN,
+            cls.NONE
+        ]
+
+    @classmethod
+    def get_intensity_properties(cls):
+        """Properties suitable for intensity encoding"""
+        return [
+            cls.MASS,
+            cls.MASS_LOG,
+            cls.SPIN,
+            cls.STABILITY,
+            cls.HALF_LIFE_LOG,
+            cls.MEAN_LIFETIME_LOG,
+            cls.DECAY_WIDTH,
+            cls.NONE
+        ]
+
+    @classmethod
+    def get_glow_properties(cls):
+        """Properties suitable for glow/emission effect encoding"""
+        return [
+            cls.STABILITY,
+            cls.HALF_LIFE_LOG,
+            cls.MEAN_LIFETIME_LOG,
+            cls.DECAY_WIDTH,
+            cls.SPIN,
+            cls.STRANGENESS,
+            cls.CHARM,
+            cls.BOTTOMNESS,
+            cls.NONE
+        ]
+
+    @classmethod
+    def get_border_properties(cls):
+        """Properties suitable for border encoding"""
+        return [
+            cls.CHARGE,
+            cls.BARYON_NUMBER,
+            cls.LEPTON_NUMBER,
+            cls.PARITY,
+            cls.C_PARITY,
+            cls.STRANGENESS,
+            cls.CHARM,
+            cls.BOTTOMNESS,
             cls.NONE
         ]
 

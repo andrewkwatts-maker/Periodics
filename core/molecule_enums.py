@@ -58,12 +58,20 @@ class MoleculeProperty(Enum):
     BOILING_POINT = "boiling_point"
     DENSITY = "density"
     DIPOLE_MOMENT = "dipole_moment"
+    VAPOR_PRESSURE = "vapor_pressure"
+    SOLUBILITY = "solubility"
 
     # Chemical properties
     BOND_TYPE = "bond_type"
     GEOMETRY = "geometry"
     POLARITY = "polarity"
     BOND_ANGLE = "bond_angle"
+    ELECTRONEGATIVITY_DIFF = "electronegativity_diff"
+
+    # Structural properties (derived)
+    NUM_ATOMS = "num_atoms"
+    NUM_BONDS = "num_bonds"
+    BOND_LENGTH_AVG = "bond_length_avg"
 
     # State
     STATE_STP = "state_stp"
@@ -98,10 +106,16 @@ class MoleculeProperty(Enum):
             cls.BOILING_POINT: "Boiling Point",
             cls.DENSITY: "Density",
             cls.DIPOLE_MOMENT: "Dipole Moment",
+            cls.VAPOR_PRESSURE: "Vapor Pressure",
+            cls.SOLUBILITY: "Solubility",
             cls.BOND_TYPE: "Bond Type",
             cls.GEOMETRY: "Geometry",
             cls.POLARITY: "Polarity",
             cls.BOND_ANGLE: "Bond Angle",
+            cls.ELECTRONEGATIVITY_DIFF: "Electronegativity Diff",
+            cls.NUM_ATOMS: "Number of Atoms",
+            cls.NUM_BONDS: "Number of Bonds",
+            cls.BOND_LENGTH_AVG: "Avg Bond Length",
             cls.STATE_STP: "State at STP",
             cls.CATEGORY: "Category",
             cls.NONE: "None"
@@ -117,6 +131,13 @@ class MoleculeProperty(Enum):
             cls.BOILING_POINT,
             cls.DENSITY,
             cls.DIPOLE_MOMENT,
+            cls.VAPOR_PRESSURE,
+            cls.SOLUBILITY,
+            cls.BOND_ANGLE,
+            cls.ELECTRONEGATIVITY_DIFF,
+            cls.NUM_ATOMS,
+            cls.NUM_BONDS,
+            cls.BOND_LENGTH_AVG,
             cls.BOND_TYPE,
             cls.GEOMETRY,
             cls.POLARITY,
@@ -132,6 +153,58 @@ class MoleculeProperty(Enum):
             cls.DENSITY,
             cls.DIPOLE_MOMENT,
             cls.BOND_ANGLE,
+            cls.NUM_ATOMS,
+            cls.NUM_BONDS,
+            cls.BOND_LENGTH_AVG,
+            cls.VAPOR_PRESSURE,
+            cls.SOLUBILITY,
+            cls.ELECTRONEGATIVITY_DIFF,
+            cls.NONE
+        ]
+
+    @classmethod
+    def get_numeric_properties(cls):
+        """Get ordered list of all numeric properties for visual encoding"""
+        return [
+            cls.MOLECULAR_MASS,
+            cls.DENSITY,
+            cls.MELTING_POINT,
+            cls.BOILING_POINT,
+            cls.BOND_ANGLE,
+            cls.DIPOLE_MOMENT,
+            cls.VAPOR_PRESSURE,
+            cls.SOLUBILITY,
+            cls.NUM_ATOMS,
+            cls.NUM_BONDS,
+            cls.ELECTRONEGATIVITY_DIFF,
+            cls.BOND_LENGTH_AVG,
+        ]
+
+    @classmethod
+    def get_glow_properties(cls):
+        """Get ordered list of properties suitable for glow/highlight encoding"""
+        return [
+            cls.DIPOLE_MOMENT,
+            cls.ELECTRONEGATIVITY_DIFF,
+            cls.MOLECULAR_MASS,
+            cls.DENSITY,
+            cls.MELTING_POINT,
+            cls.BOILING_POINT,
+            cls.VAPOR_PRESSURE,
+            cls.NONE
+        ]
+
+    @classmethod
+    def get_border_properties(cls):
+        """Get ordered list of properties suitable for border intensity encoding"""
+        return [
+            cls.BOILING_POINT,
+            cls.MELTING_POINT,
+            cls.DENSITY,
+            cls.DIPOLE_MOMENT,
+            cls.MOLECULAR_MASS,
+            cls.NUM_BONDS,
+            cls.ELECTRONEGATIVITY_DIFF,
             cls.NONE
         ]
 

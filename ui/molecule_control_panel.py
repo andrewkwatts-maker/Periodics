@@ -22,42 +22,135 @@ MOLECULE_PROPERTY_METADATA = {
         "unit": "amu",
         "min_value": 1.0,
         "max_value": 500.0,
+        "description": "Total mass of the molecule in atomic mass units"
     },
     "melting_point": {
         "display_name": "Melting Point",
         "unit": "K",
         "min_value": 0.0,
         "max_value": 1000.0,
+        "description": "Temperature at which the molecule transitions from solid to liquid"
     },
     "boiling_point": {
         "display_name": "Boiling Point",
         "unit": "K",
         "min_value": 0.0,
         "max_value": 1500.0,
+        "description": "Temperature at which the molecule transitions from liquid to gas"
     },
     "density": {
         "display_name": "Density",
         "unit": "g/cm3",
         "min_value": 0.0,
         "max_value": 5.0,
+        "description": "Mass per unit volume at standard conditions"
     },
     "dipole_moment": {
         "display_name": "Dipole Moment",
         "unit": "D",
         "min_value": 0.0,
         "max_value": 10.0,
+        "description": "Measure of molecular polarity (Debye units)"
     },
     "bond_angle": {
         "display_name": "Bond Angle",
         "unit": "deg",
         "min_value": 0.0,
         "max_value": 180.0,
+        "description": "Angle between adjacent bonds in the molecule"
+    },
+    "vapor_pressure": {
+        "display_name": "Vapor Pressure",
+        "unit": "kPa",
+        "min_value": 0.0,
+        "max_value": 200.0,
+        "description": "Pressure exerted by vapor in equilibrium with liquid"
+    },
+    "solubility": {
+        "display_name": "Solubility",
+        "unit": "g/L",
+        "min_value": 0.0,
+        "max_value": 1000.0,
+        "description": "Amount that dissolves in water at standard conditions"
+    },
+    "num_atoms": {
+        "display_name": "Number of Atoms",
+        "unit": "",
+        "min_value": 1.0,
+        "max_value": 50.0,
+        "description": "Total number of atoms in the molecule"
+    },
+    "num_bonds": {
+        "display_name": "Number of Bonds",
+        "unit": "",
+        "min_value": 1.0,
+        "max_value": 60.0,
+        "description": "Total number of chemical bonds"
+    },
+    "electronegativity_diff": {
+        "display_name": "Electronegativity Diff",
+        "unit": "",
+        "min_value": 0.0,
+        "max_value": 3.5,
+        "description": "Maximum electronegativity difference between bonded atoms"
+    },
+    "bond_length_avg": {
+        "display_name": "Avg Bond Length",
+        "unit": "pm",
+        "min_value": 70.0,
+        "max_value": 200.0,
+        "description": "Average length of bonds in the molecule"
     },
     "none": {
         "display_name": "None",
         "unit": "",
         "min_value": 0.0,
         "max_value": 100.0,
+        "description": "No property encoding"
+    }
+}
+
+# Visual attribute types and their descriptions
+VISUAL_ATTRIBUTE_TYPES = {
+    "fill_color": {
+        "display_name": "Card Color Gradient",
+        "description": "Background color gradient based on property value",
+        "type": "color"
+    },
+    "border_color": {
+        "display_name": "Border Color",
+        "description": "Border color intensity based on property value",
+        "type": "color"
+    },
+    "glow_color": {
+        "display_name": "Glow/Highlight",
+        "description": "Glow effect intensity based on property value",
+        "type": "color"
+    },
+    "symbol_text_color": {
+        "display_name": "Text Color",
+        "description": "Formula/name text color based on property value",
+        "type": "color"
+    },
+    "border_size": {
+        "display_name": "Border Intensity",
+        "description": "Border thickness/weight based on property value",
+        "type": "size"
+    },
+    "card_size": {
+        "display_name": "Card Size",
+        "description": "Overall card size scaling based on property value",
+        "type": "size"
+    },
+    "glow_intensity": {
+        "display_name": "Glow Intensity",
+        "description": "Strength of the glow effect",
+        "type": "size"
+    },
+    "opacity": {
+        "display_name": "Opacity",
+        "description": "Card transparency based on property value",
+        "type": "size"
     }
 }
 
@@ -65,6 +158,119 @@ MOLECULE_PROPERTY_METADATA = {
 def get_molecule_property_metadata(property_name):
     """Get metadata for a molecule property"""
     return MOLECULE_PROPERTY_METADATA.get(property_name, MOLECULE_PROPERTY_METADATA["none"])
+
+
+def get_all_visual_encoding_options():
+    """Get a comprehensive summary of all available visual encoding options for molecules.
+
+    Returns:
+        Dictionary containing:
+        - numeric_properties: List of all numeric properties available for encoding
+        - visual_attributes: List of all visual attributes that can be mapped
+        - color_encodings: Properties suitable for color encoding
+        - size_encodings: Properties suitable for size encoding
+        - default_mappings: Default property-to-visual mappings
+    """
+    return {
+        "numeric_properties": {
+            "molecular_mass": {
+                "display": "Molecular Mass",
+                "unit": "amu",
+                "range": (1.0, 500.0),
+                "description": "Total mass of the molecule"
+            },
+            "density": {
+                "display": "Density",
+                "unit": "g/cm3",
+                "range": (0.0, 5.0),
+                "description": "Mass per unit volume"
+            },
+            "melting_point": {
+                "display": "Melting Point",
+                "unit": "K",
+                "range": (0.0, 1000.0),
+                "description": "Solid to liquid transition temperature"
+            },
+            "boiling_point": {
+                "display": "Boiling Point",
+                "unit": "K",
+                "range": (0.0, 1500.0),
+                "description": "Liquid to gas transition temperature"
+            },
+            "bond_angle": {
+                "display": "Bond Angle",
+                "unit": "deg",
+                "range": (0.0, 180.0),
+                "description": "Angle between adjacent bonds"
+            },
+            "dipole_moment": {
+                "display": "Dipole Moment",
+                "unit": "D",
+                "range": (0.0, 10.0),
+                "description": "Measure of molecular polarity"
+            },
+            "vapor_pressure": {
+                "display": "Vapor Pressure",
+                "unit": "kPa",
+                "range": (0.0, 200.0),
+                "description": "Equilibrium vapor pressure"
+            },
+            "solubility": {
+                "display": "Solubility",
+                "unit": "g/L",
+                "range": (0.0, 1000.0),
+                "description": "Water solubility at STP"
+            },
+            "num_atoms": {
+                "display": "Number of Atoms",
+                "unit": "",
+                "range": (1, 50),
+                "description": "Total atom count (derived)"
+            },
+            "num_bonds": {
+                "display": "Number of Bonds",
+                "unit": "",
+                "range": (1, 60),
+                "description": "Total bond count (derived)"
+            },
+            "electronegativity_diff": {
+                "display": "Electronegativity Diff",
+                "unit": "",
+                "range": (0.0, 3.5),
+                "description": "Max electronegativity difference"
+            },
+            "bond_length_avg": {
+                "display": "Avg Bond Length",
+                "unit": "pm",
+                "range": (70.0, 200.0),
+                "description": "Average bond length (derived)"
+            }
+        },
+        "visual_attributes": {
+            "color_encodings": [
+                {"key": "fill_color", "display": "Card Color Gradient", "description": "Background gradient color"},
+                {"key": "border_color", "display": "Border Color", "description": "Card border color"},
+                {"key": "glow_color", "display": "Glow/Highlight", "description": "Glow effect color"},
+                {"key": "symbol_text_color", "display": "Text Color", "description": "Formula/name text color"}
+            ],
+            "size_encodings": [
+                {"key": "border_size", "display": "Border Intensity", "description": "Border thickness"},
+                {"key": "card_size", "display": "Card Size", "description": "Overall card scaling"},
+                {"key": "glow_intensity", "display": "Glow Intensity", "description": "Glow effect strength"},
+                {"key": "opacity", "display": "Opacity", "description": "Card transparency"}
+            ]
+        },
+        "default_mappings": {
+            "fill_color": "molecular_mass",
+            "border_color": "boiling_point",
+            "glow_color": "dipole_moment",
+            "symbol_text_color": "density",
+            "border_size": "melting_point",
+            "card_size": "num_atoms",
+            "glow_intensity": "electronegativity_diff",
+            "opacity": "num_bonds"
+        }
+    }
 
 
 class CollapsibleBox(QWidget):
@@ -362,9 +568,10 @@ class MoleculePropertyControl(QWidget):
         self.current_property = prop_display.lower().replace(" ", "_")
         self._update_property_metadata()
 
-        # Reset sliders to full range
-        self.min_slider.setValue(0)
-        self.max_slider.setValue(1000)
+        # Reset sliders to full range (guard against being called before sliders exist)
+        if hasattr(self, 'min_slider') and hasattr(self, 'max_slider'):
+            self.min_slider.setValue(0)
+            self.max_slider.setValue(1000)
 
         self.property_changed.emit(self.property_key, self.current_property)
 
@@ -591,13 +798,31 @@ class MoleculeControlPanel(QWidget):
         """Create visual property encodings with expandable controls"""
         collapsible = CollapsibleBox("Visual Property Encodings", "#764ba2")
 
-        # Available property options for molecules
-        color_properties = ["Molecular Mass", "Boiling Point", "Melting Point", "Density", "Dipole Moment", "None"]
-        size_properties = ["Molecular Mass", "Density", "Dipole Moment", "Bond Angle", "None"]
+        # Comprehensive property options for molecules (all numeric properties)
+        color_properties = [
+            "Molecular Mass", "Boiling Point", "Melting Point", "Density",
+            "Dipole Moment", "Vapor Pressure", "Solubility", "Bond Angle",
+            "Electronegativity Diff", "Number of Atoms", "Number of Bonds",
+            "Avg Bond Length", "None"
+        ]
+        size_properties = [
+            "Molecular Mass", "Density", "Dipole Moment", "Bond Angle",
+            "Number of Atoms", "Number of Bonds", "Avg Bond Length",
+            "Vapor Pressure", "Solubility", "Electronegativity Diff", "None"
+        ]
+        glow_properties = [
+            "Dipole Moment", "Electronegativity Diff", "Molecular Mass",
+            "Density", "Melting Point", "Boiling Point", "Vapor Pressure", "None"
+        ]
 
-        # 1. Fill Colour -> Molecular Mass
+        # Section header for color encodings
+        color_header = QLabel("Color Encodings:")
+        color_header.setStyleSheet("color: #f093fb; font-weight: bold; font-size: 11px; margin-top: 5px;")
+        collapsible.content_layout.addWidget(color_header)
+
+        # 1. Card Color Gradient -> Molecular Mass
         self.fill_color_control = MoleculePropertyControl(
-            "Fill Colour", "fill_color", self, color_properties,
+            "Card Color Gradient", "fill_color", self, color_properties,
             control_type="color", default_property="molecular_mass"
         )
         self.fill_color_control.property_changed.connect(self._on_property_changed)
@@ -615,10 +840,10 @@ class MoleculeControlPanel(QWidget):
         self.border_color_control.gradient_colors_changed.connect(self._on_gradient_colors_changed)
         collapsible.content_layout.addWidget(self.border_color_control)
 
-        # 3. Glow Colour -> Melting Point
+        # 3. Glow/Highlight -> Dipole Moment (polarity indicator)
         self.glow_color_control = MoleculePropertyControl(
-            "Glow Colour", "glow_color", self, color_properties,
-            control_type="color", default_property="melting_point"
+            "Glow/Highlight", "glow_color", self, glow_properties,
+            control_type="color", default_property="dipole_moment"
         )
         self.glow_color_control.property_changed.connect(self._on_property_changed)
         self.glow_color_control.filter_range_changed.connect(self._on_filter_range_changed)
@@ -627,7 +852,7 @@ class MoleculeControlPanel(QWidget):
 
         # 4. Symbol Text Colour -> Density
         self.symbol_text_color_control = MoleculePropertyControl(
-            "Symbol Text Colour", "symbol_text_color", self, color_properties,
+            "Text Colour", "symbol_text_color", self, color_properties,
             control_type="color", default_property="density"
         )
         self.symbol_text_color_control.property_changed.connect(self._on_property_changed)
@@ -635,14 +860,46 @@ class MoleculeControlPanel(QWidget):
         self.symbol_text_color_control.gradient_colors_changed.connect(self._on_gradient_colors_changed)
         collapsible.content_layout.addWidget(self.symbol_text_color_control)
 
-        # 5. Border Size -> Dipole Moment
+        # Section header for size/intensity encodings
+        size_header = QLabel("Size & Intensity Encodings:")
+        size_header.setStyleSheet("color: #4fc3f7; font-weight: bold; font-size: 11px; margin-top: 10px;")
+        collapsible.content_layout.addWidget(size_header)
+
+        # 5. Border Intensity -> Melting Point
         self.border_size_control = MoleculePropertyControl(
-            "Border Size", "border_size", self, size_properties,
-            control_type="size", default_property="dipole_moment"
+            "Border Intensity", "border_size", self, size_properties,
+            control_type="size", default_property="melting_point"
         )
         self.border_size_control.property_changed.connect(self._on_property_changed)
         self.border_size_control.filter_range_changed.connect(self._on_filter_range_changed)
         collapsible.content_layout.addWidget(self.border_size_control)
+
+        # 6. Card Size Scaling -> Number of Atoms
+        self.card_size_control = MoleculePropertyControl(
+            "Card Size", "card_size", self, size_properties,
+            control_type="size", default_property="num_atoms"
+        )
+        self.card_size_control.property_changed.connect(self._on_property_changed)
+        self.card_size_control.filter_range_changed.connect(self._on_filter_range_changed)
+        collapsible.content_layout.addWidget(self.card_size_control)
+
+        # 7. Glow Intensity -> Electronegativity Diff
+        self.glow_intensity_control = MoleculePropertyControl(
+            "Glow Intensity", "glow_intensity", self, size_properties,
+            control_type="size", default_property="electronegativity_diff"
+        )
+        self.glow_intensity_control.property_changed.connect(self._on_property_changed)
+        self.glow_intensity_control.filter_range_changed.connect(self._on_filter_range_changed)
+        collapsible.content_layout.addWidget(self.glow_intensity_control)
+
+        # 8. Opacity -> Number of Bonds
+        self.opacity_control = MoleculePropertyControl(
+            "Opacity", "opacity", self, size_properties,
+            control_type="size", default_property="num_bonds"
+        )
+        self.opacity_control.property_changed.connect(self._on_property_changed)
+        self.opacity_control.filter_range_changed.connect(self._on_filter_range_changed)
+        collapsible.content_layout.addWidget(self.opacity_control)
 
         # Reset button to restore default mappings
         reset_button = QPushButton("Reset to Defaults")
@@ -1058,7 +1315,17 @@ class MoleculeControlPanel(QWidget):
 
     def _on_property_changed(self, property_key, property_name):
         """Handle property mapping change"""
-        if hasattr(self.table, 'set_property_mapping'):
+        # Route to specific methods for new visual encoding types
+        if property_key == 'card_size':
+            if hasattr(self.table, 'set_card_size_mapping'):
+                self.table.set_card_size_mapping(property_name)
+        elif property_key == 'glow_intensity':
+            if hasattr(self.table, 'set_glow_intensity_mapping'):
+                self.table.set_glow_intensity_mapping(property_name)
+        elif property_key == 'opacity':
+            if hasattr(self.table, 'set_opacity_mapping'):
+                self.table.set_opacity_mapping(property_name)
+        elif hasattr(self.table, 'set_property_mapping'):
             self.table.set_property_mapping(property_key, property_name)
 
     def _on_filter_range_changed(self, property_key, min_val, max_val):
@@ -1187,30 +1454,45 @@ class MoleculeControlPanel(QWidget):
 
     def _reset_property_mappings(self):
         """Reset all property controls to their default mappings"""
-        # Reset fill color
+        # Reset fill color (Card Color Gradient -> Molecular Mass)
         self.fill_color_control.property_combo.setCurrentIndex(0)  # Molecular Mass
         self.fill_color_control.min_slider.setValue(0)
         self.fill_color_control.max_slider.setValue(1000)
 
-        # Reset border color
+        # Reset border color (Border Colour -> Boiling Point)
         self.border_color_control.property_combo.setCurrentIndex(1)  # Boiling Point
         self.border_color_control.min_slider.setValue(0)
         self.border_color_control.max_slider.setValue(1000)
 
-        # Reset glow color
-        self.glow_color_control.property_combo.setCurrentIndex(2)  # Melting Point
+        # Reset glow color (Glow/Highlight -> Dipole Moment)
+        self.glow_color_control.property_combo.setCurrentIndex(0)  # Dipole Moment
         self.glow_color_control.min_slider.setValue(0)
         self.glow_color_control.max_slider.setValue(1000)
 
-        # Reset symbol text color
+        # Reset symbol text color (Text Colour -> Density)
         self.symbol_text_color_control.property_combo.setCurrentIndex(3)  # Density
         self.symbol_text_color_control.min_slider.setValue(0)
         self.symbol_text_color_control.max_slider.setValue(1000)
 
-        # Reset border size
-        self.border_size_control.property_combo.setCurrentIndex(2)  # Dipole Moment
+        # Reset border size (Border Intensity -> Melting Point)
+        self.border_size_control.property_combo.setCurrentIndex(2)  # Melting Point (index 2 in size_properties)
         self.border_size_control.min_slider.setValue(0)
         self.border_size_control.max_slider.setValue(1000)
+
+        # Reset card size (Card Size -> Number of Atoms)
+        self.card_size_control.property_combo.setCurrentIndex(4)  # Number of Atoms
+        self.card_size_control.min_slider.setValue(0)
+        self.card_size_control.max_slider.setValue(1000)
+
+        # Reset glow intensity (Glow Intensity -> Electronegativity Diff)
+        self.glow_intensity_control.property_combo.setCurrentIndex(9)  # Electronegativity Diff
+        self.glow_intensity_control.min_slider.setValue(0)
+        self.glow_intensity_control.max_slider.setValue(1000)
+
+        # Reset opacity (Opacity -> Number of Bonds)
+        self.opacity_control.property_combo.setCurrentIndex(5)  # Number of Bonds
+        self.opacity_control.min_slider.setValue(0)
+        self.opacity_control.max_slider.setValue(1000)
 
     # === Public API ===
 

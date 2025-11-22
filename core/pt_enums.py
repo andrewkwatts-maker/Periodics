@@ -19,6 +19,7 @@ class PTPropertyName(Enum):
     """Element properties that can be visualized or used for ordering"""
     # Basic atomic properties
     ATOMIC_NUMBER = "atomic_number"
+    ATOMIC_MASS = "atomic_mass"
     MASS_NUMBER = "mass_number"
     ELECTRONS = "electrons"
     NEUTRONS = "neutrons"
@@ -44,6 +45,9 @@ class PTPropertyName(Enum):
     DENSITY = "density"
     ELECTRON_AFFINITY = "electron_affinity"
     VALENCE = "valence"
+    SPECIFIC_HEAT = "specific_heat"
+    THERMAL_CONDUCTIVITY = "thermal_conductivity"
+    ELECTRICAL_CONDUCTIVITY = "electrical_conductivity"
 
     # Wavelength/spectrum properties
     WAVELENGTH = "wavelength"
@@ -85,6 +89,7 @@ class PTPropertyName(Enum):
         """Get ordered list of properties suitable for color encoding"""
         return [
             cls.ATOMIC_NUMBER,
+            cls.ATOMIC_MASS,
             cls.IONIZATION,
             cls.ELECTRONEGATIVITY,
             cls.MELTING,
@@ -93,7 +98,12 @@ class PTPropertyName(Enum):
             cls.DENSITY,
             cls.ELECTRON_AFFINITY,
             cls.VALENCE,
+            cls.GROUP,
+            cls.PERIOD,
             cls.BLOCK,
+            cls.SPECIFIC_HEAT,
+            cls.THERMAL_CONDUCTIVITY,
+            cls.ELECTRICAL_CONDUCTIVITY,
             cls.EMISSION_WAVELENGTH,
             cls.VISIBLE_EMISSION_WAVELENGTH,
             cls.IONIZATION_WAVELENGTH,
@@ -106,6 +116,7 @@ class PTPropertyName(Enum):
         """Get ordered list of properties suitable for size encoding"""
         return [
             cls.ATOMIC_NUMBER,
+            cls.ATOMIC_MASS,
             cls.RADIUS,
             cls.IONIZATION,
             cls.ELECTRONEGATIVITY,
@@ -114,6 +125,11 @@ class PTPropertyName(Enum):
             cls.DENSITY,
             cls.ELECTRON_AFFINITY,
             cls.VALENCE,
+            cls.GROUP,
+            cls.PERIOD,
+            cls.SPECIFIC_HEAT,
+            cls.THERMAL_CONDUCTIVITY,
+            cls.ELECTRICAL_CONDUCTIVITY,
             cls.NONE
         ]
 
@@ -122,6 +138,7 @@ class PTPropertyName(Enum):
         """Get ordered list of properties suitable for intensity encoding"""
         return [
             cls.ATOMIC_NUMBER,
+            cls.ATOMIC_MASS,
             cls.MELTING,
             cls.IONIZATION,
             cls.RADIUS,
@@ -130,6 +147,11 @@ class PTPropertyName(Enum):
             cls.ELECTRON_AFFINITY,
             cls.ELECTRONEGATIVITY,
             cls.VALENCE,
+            cls.GROUP,
+            cls.PERIOD,
+            cls.SPECIFIC_HEAT,
+            cls.THERMAL_CONDUCTIVITY,
+            cls.ELECTRICAL_CONDUCTIVITY,
             cls.NONE
         ]
 
@@ -141,6 +163,7 @@ class PTPropertyName(Enum):
 
         display_names = {
             cls.ATOMIC_NUMBER: "Atomic Number",
+            cls.ATOMIC_MASS: "Atomic Mass",
             cls.IONIZATION: "Ionization Energy",
             cls.IONIZATION_ENERGY: "Ionization Energy",
             cls.ELECTRONEGATIVITY: "Electronegativity",
@@ -150,7 +173,12 @@ class PTPropertyName(Enum):
             cls.DENSITY: "Density",
             cls.ELECTRON_AFFINITY: "Electron Affinity",
             cls.VALENCE: "Valence Electrons",
+            cls.GROUP: "Group Number",
+            cls.PERIOD: "Period Number",
             cls.BLOCK: "Orbital Block",
+            cls.SPECIFIC_HEAT: "Specific Heat",
+            cls.THERMAL_CONDUCTIVITY: "Thermal Conductivity",
+            cls.ELECTRICAL_CONDUCTIVITY: "Electrical Conductivity",
             cls.WAVELENGTH: "Wavelength",
             cls.EMISSION_WAVELENGTH: "Emission Wavelength",
             cls.VISIBLE_EMISSION_WAVELENGTH: "Visible Emission",
@@ -165,6 +193,7 @@ class PTPropertyName(Enum):
         """Convert UI display name to property enum"""
         name_map = {
             "Atomic Number": cls.ATOMIC_NUMBER,
+            "Atomic Mass": cls.ATOMIC_MASS,
             "Ionization Energy": cls.IONIZATION,
             "Electronegativity": cls.ELECTRONEGATIVITY,
             "Melting Point": cls.MELTING,
@@ -173,7 +202,12 @@ class PTPropertyName(Enum):
             "Density": cls.DENSITY,
             "Electron Affinity": cls.ELECTRON_AFFINITY,
             "Valence Electrons": cls.VALENCE,
+            "Group Number": cls.GROUP,
+            "Period Number": cls.PERIOD,
             "Orbital Block": cls.BLOCK,
+            "Specific Heat": cls.SPECIFIC_HEAT,
+            "Thermal Conductivity": cls.THERMAL_CONDUCTIVITY,
+            "Electrical Conductivity": cls.ELECTRICAL_CONDUCTIVITY,
             "Wavelength": cls.WAVELENGTH,
             "Emission Wavelength": cls.EMISSION_WAVELENGTH,
             "Visible Emission": cls.VISIBLE_EMISSION_WAVELENGTH,

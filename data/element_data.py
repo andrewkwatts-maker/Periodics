@@ -511,6 +511,12 @@ def get_property_metadata(property_name):
             "max_value": 118,
             "type": "numeric"
         },
+        "atomic_mass": {
+            "unit": "u",
+            "min_value": 1.008,
+            "max_value": 294,
+            "type": "numeric"
+        },
         "ionization": {
             "unit": "eV",
             "min_value": min(IE_DATA.values()),
@@ -557,6 +563,36 @@ def get_property_metadata(property_name):
             "unit": "electrons",
             "min_value": 1,
             "max_value": 8,
+            "type": "numeric"
+        },
+        "group": {
+            "unit": "",
+            "min_value": 1,
+            "max_value": 18,
+            "type": "numeric"
+        },
+        "period": {
+            "unit": "",
+            "min_value": 1,
+            "max_value": 7,
+            "type": "numeric"
+        },
+        "specific_heat": {
+            "unit": "J/(g·K)",
+            "min_value": 0.1,
+            "max_value": 15,
+            "type": "numeric"
+        },
+        "thermal_conductivity": {
+            "unit": "W/(m·K)",
+            "min_value": 0.01,
+            "max_value": 500,
+            "type": "numeric"
+        },
+        "electrical_conductivity": {
+            "unit": "MS/m",
+            "min_value": 0,
+            "max_value": 65,
             "type": "numeric"
         },
         "wavelength": {

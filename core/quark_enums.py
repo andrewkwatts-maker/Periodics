@@ -104,6 +104,7 @@ class ParticleType(Enum):
 class QuarkProperty(Enum):
     """Particle properties that can be visualized"""
     MASS = "mass"
+    MASS_LOG = "mass_log"  # Log scale for wide mass range
     CHARGE = "charge"
     SPIN = "spin"
     PARTICLE_TYPE = "particle_type"
@@ -113,6 +114,12 @@ class QuarkProperty(Enum):
     BARYON_NUMBER = "baryon_number"
     LEPTON_NUMBER = "lepton_number"
     ISOSPIN = "isospin"
+    ISOSPIN_I3 = "isospin_i3"  # Third component of isospin
+    PARITY = "parity"
+    HALF_LIFE = "half_life"
+    HALF_LIFE_LOG = "half_life_log"  # Log scale for lifetime
+    DECAY_WIDTH = "decay_width"
+    MAGNETIC_MOMENT = "magnetic_moment"
     NONE = "none"
 
     @classmethod
@@ -131,19 +138,87 @@ class QuarkProperty(Enum):
         if isinstance(prop, str):
             prop = cls.from_string(prop)
         names = {
-            cls.MASS: "Mass",
-            cls.CHARGE: "Charge",
-            cls.SPIN: "Spin",
+            cls.MASS: "Mass (MeV/c^2)",
+            cls.MASS_LOG: "Mass (log scale)",
+            cls.CHARGE: "Charge (e)",
+            cls.SPIN: "Spin (hbar)",
             cls.PARTICLE_TYPE: "Particle Type",
             cls.INTERACTION: "Interaction Forces",
             cls.STABILITY: "Stability",
             cls.GENERATION: "Generation",
             cls.BARYON_NUMBER: "Baryon Number",
             cls.LEPTON_NUMBER: "Lepton Number",
-            cls.ISOSPIN: "Isospin",
+            cls.ISOSPIN: "Isospin (I)",
+            cls.ISOSPIN_I3: "Isospin I3",
+            cls.PARITY: "Parity (P)",
+            cls.HALF_LIFE: "Half-Life (s)",
+            cls.HALF_LIFE_LOG: "Half-Life (log)",
+            cls.DECAY_WIDTH: "Decay Width (MeV)",
+            cls.MAGNETIC_MOMENT: "Magnetic Moment",
             cls.NONE: "None"
         }
         return names.get(prop, "Unknown")
+
+    @classmethod
+    def get_json_key(cls, prop):
+        """Get JSON data key for property"""
+        if isinstance(prop, str):
+            prop = cls.from_string(prop)
+        keys = {
+            cls.MASS: "Mass_MeVc2",
+            cls.MASS_LOG: "Mass_MeVc2",
+            cls.CHARGE: "Charge_e",
+            cls.SPIN: "Spin_hbar",
+            cls.PARTICLE_TYPE: "Classification",
+            cls.INTERACTION: "InteractionForces",
+            cls.STABILITY: "Stability",
+            cls.GENERATION: "generation",
+            cls.BARYON_NUMBER: "BaryonNumber_B",
+            cls.LEPTON_NUMBER: "LeptonNumber_L",
+            cls.ISOSPIN: "Isospin_I",
+            cls.ISOSPIN_I3: "Isospin_I3",
+            cls.PARITY: "Parity_P",
+            cls.HALF_LIFE: "HalfLife_s",
+            cls.HALF_LIFE_LOG: "HalfLife_s",
+            cls.DECAY_WIDTH: "Width_MeV",
+            cls.MAGNETIC_MOMENT: "MagneticDipoleMoment_J_T",
+            cls.NONE: None
+        }
+        return keys.get(prop, None)
+
+    @classmethod
+    def get_property_range(cls, prop):
+        """Get default min/max range for a property"""
+        if isinstance(prop, str):
+            prop = cls.from_string(prop)
+        ranges = {
+            cls.MASS: (0.0, 175000.0),  # Up quark to top quark (MeV/c^2)
+            cls.MASS_LOG: (0.0, 12.0),  # Log10 scale
+            cls.CHARGE: (-1.0, 1.0),  # In units of e
+            cls.SPIN: (0.0, 1.0),  # In units of hbar
+            cls.PARTICLE_TYPE: (0, 5),  # Categorical
+            cls.INTERACTION: (0, 4),  # Number of forces
+            cls.STABILITY: (0, 1),  # Binary stable/unstable
+            cls.GENERATION: (0, 3),  # 0=bosons, 1-3=fermion generations
+            cls.BARYON_NUMBER: (-1.0, 1.0),
+            cls.LEPTON_NUMBER: (-1.0, 1.0),
+            cls.ISOSPIN: (0.0, 1.0),
+            cls.ISOSPIN_I3: (-1.0, 1.0),
+            cls.PARITY: (-1, 1),
+            cls.HALF_LIFE: (0.0, 1e-10),  # In seconds
+            cls.HALF_LIFE_LOG: (-25, 0),  # Log10 scale
+            cls.DECAY_WIDTH: (0.0, 2500.0),  # In MeV (top quark is ~1.42 GeV)
+            cls.MAGNETIC_MOMENT: (-1e-25, 1e-25),  # In J/T
+            cls.NONE: (0, 1)
+        }
+        return ranges.get(prop, (0, 100))
+
+    @classmethod
+    def is_log_scale(cls, prop):
+        """Check if property should use log scale"""
+        if isinstance(prop, str):
+            prop = cls.from_string(prop)
+        return prop in [cls.MASS_LOG, cls.HALF_LIFE_LOG]
 
     @classmethod
     def get_color_properties(cls):
@@ -151,11 +226,16 @@ class QuarkProperty(Enum):
         return [
             cls.PARTICLE_TYPE,
             cls.MASS,
+            cls.MASS_LOG,
             cls.CHARGE,
             cls.SPIN,
             cls.INTERACTION,
             cls.STABILITY,
             cls.GENERATION,
+            cls.ISOSPIN,
+            cls.ISOSPIN_I3,
+            cls.PARITY,
+            cls.HALF_LIFE_LOG,
             cls.NONE
         ]
 
@@ -164,10 +244,12 @@ class QuarkProperty(Enum):
         """Properties suitable for size encoding"""
         return [
             cls.MASS,
+            cls.MASS_LOG,
             cls.CHARGE,
             cls.SPIN,
             cls.BARYON_NUMBER,
             cls.LEPTON_NUMBER,
+            cls.ISOSPIN,
             cls.NONE
         ]
 
@@ -176,8 +258,36 @@ class QuarkProperty(Enum):
         """Properties suitable for intensity encoding"""
         return [
             cls.MASS,
+            cls.MASS_LOG,
             cls.SPIN,
             cls.STABILITY,
+            cls.HALF_LIFE_LOG,
+            cls.DECAY_WIDTH,
+            cls.NONE
+        ]
+
+    @classmethod
+    def get_glow_properties(cls):
+        """Properties suitable for glow/emission effect encoding"""
+        return [
+            cls.STABILITY,
+            cls.HALF_LIFE_LOG,
+            cls.DECAY_WIDTH,
+            cls.INTERACTION,
+            cls.SPIN,
+            cls.NONE
+        ]
+
+    @classmethod
+    def get_border_properties(cls):
+        """Properties suitable for border encoding"""
+        return [
+            cls.CHARGE,
+            cls.PARTICLE_TYPE,
+            cls.GENERATION,
+            cls.PARITY,
+            cls.BARYON_NUMBER,
+            cls.LEPTON_NUMBER,
             cls.NONE
         ]
 

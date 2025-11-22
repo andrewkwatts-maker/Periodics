@@ -151,6 +151,7 @@ class AlloyProperty(Enum):
     DENSITY = "density"
     MELTING_POINT = "melting_point"
     THERMAL_CONDUCTIVITY = "thermal_conductivity"
+    THERMAL_EXPANSION = "thermal_expansion"
     ELECTRICAL_RESISTIVITY = "electrical_resistivity"
     SPECIFIC_HEAT = "specific_heat"
 
@@ -158,8 +159,25 @@ class AlloyProperty(Enum):
     TENSILE_STRENGTH = "tensile_strength"
     YIELD_STRENGTH = "yield_strength"
     HARDNESS = "hardness"
+    HARDNESS_BRINELL = "hardness_brinell"
+    HARDNESS_VICKERS = "hardness_vickers"
+    HARDNESS_ROCKWELL = "hardness_rockwell"
     ELONGATION = "elongation"
+    REDUCTION_OF_AREA = "reduction_of_area"
     YOUNGS_MODULUS = "youngs_modulus"
+    SHEAR_MODULUS = "shear_modulus"
+    POISSONS_RATIO = "poissons_ratio"
+    IMPACT_STRENGTH = "impact_strength"
+    FATIGUE_STRENGTH = "fatigue_strength"
+    FRACTURE_TOUGHNESS = "fracture_toughness"
+
+    # Corrosion properties
+    CORROSION_RESISTANCE = "corrosion_resistance"
+    PREN = "pren"
+    PITTING_POTENTIAL = "pitting_potential"
+
+    # Economic properties
+    COST_PER_KG = "cost_per_kg"
 
     # Lattice properties
     CRYSTAL_STRUCTURE = "crystal_structure"
@@ -192,13 +210,27 @@ class AlloyProperty(Enum):
             cls.DENSITY: "Density",
             cls.MELTING_POINT: "Melting Point",
             cls.THERMAL_CONDUCTIVITY: "Thermal Conductivity",
+            cls.THERMAL_EXPANSION: "Thermal Expansion",
             cls.ELECTRICAL_RESISTIVITY: "Electrical Resistivity",
             cls.SPECIFIC_HEAT: "Specific Heat",
             cls.TENSILE_STRENGTH: "Tensile Strength",
             cls.YIELD_STRENGTH: "Yield Strength",
             cls.HARDNESS: "Hardness",
+            cls.HARDNESS_BRINELL: "Hardness (Brinell)",
+            cls.HARDNESS_VICKERS: "Hardness (Vickers)",
+            cls.HARDNESS_ROCKWELL: "Hardness (Rockwell)",
             cls.ELONGATION: "Elongation",
+            cls.REDUCTION_OF_AREA: "Reduction of Area",
             cls.YOUNGS_MODULUS: "Young's Modulus",
+            cls.SHEAR_MODULUS: "Shear Modulus",
+            cls.POISSONS_RATIO: "Poisson's Ratio",
+            cls.IMPACT_STRENGTH: "Impact Strength",
+            cls.FATIGUE_STRENGTH: "Fatigue Strength",
+            cls.FRACTURE_TOUGHNESS: "Fracture Toughness",
+            cls.CORROSION_RESISTANCE: "Corrosion Resistance",
+            cls.PREN: "PREN",
+            cls.PITTING_POTENTIAL: "Pitting Potential",
+            cls.COST_PER_KG: "Cost per kg",
             cls.CRYSTAL_STRUCTURE: "Crystal Structure",
             cls.LATTICE_PARAMETER: "Lattice Parameter",
             cls.PACKING_FACTOR: "Packing Factor",
@@ -213,16 +245,30 @@ class AlloyProperty(Enum):
             prop = cls.from_string(prop)
 
         units = {
-            cls.DENSITY: "g/cm³",
+            cls.DENSITY: "g/cm3",
             cls.MELTING_POINT: "K",
-            cls.THERMAL_CONDUCTIVITY: "W/m·K",
-            cls.ELECTRICAL_RESISTIVITY: "Ω·m",
-            cls.SPECIFIC_HEAT: "J/kg·K",
+            cls.THERMAL_CONDUCTIVITY: "W/m-K",
+            cls.THERMAL_EXPANSION: "1/K",
+            cls.ELECTRICAL_RESISTIVITY: "Ohm-m",
+            cls.SPECIFIC_HEAT: "J/kg-K",
             cls.TENSILE_STRENGTH: "MPa",
             cls.YIELD_STRENGTH: "MPa",
             cls.HARDNESS: "HB",
+            cls.HARDNESS_BRINELL: "HB",
+            cls.HARDNESS_VICKERS: "HV",
+            cls.HARDNESS_ROCKWELL: "HRC",
             cls.ELONGATION: "%",
+            cls.REDUCTION_OF_AREA: "%",
             cls.YOUNGS_MODULUS: "GPa",
+            cls.SHEAR_MODULUS: "GPa",
+            cls.POISSONS_RATIO: "",
+            cls.IMPACT_STRENGTH: "J",
+            cls.FATIGUE_STRENGTH: "MPa",
+            cls.FRACTURE_TOUGHNESS: "MPa-m^0.5",
+            cls.CORROSION_RESISTANCE: "",
+            cls.PREN: "",
+            cls.PITTING_POTENTIAL: "mV",
+            cls.COST_PER_KG: "$/kg",
             cls.LATTICE_PARAMETER: "pm",
             cls.PACKING_FACTOR: ""
         }
@@ -236,8 +282,14 @@ class AlloyProperty(Enum):
             cls.YIELD_STRENGTH,
             cls.TENSILE_STRENGTH,
             cls.HARDNESS,
+            cls.HARDNESS_BRINELL,
+            cls.HARDNESS_VICKERS,
             cls.YOUNGS_MODULUS,
-            cls.MELTING_POINT
+            cls.SHEAR_MODULUS,
+            cls.MELTING_POINT,
+            cls.THERMAL_CONDUCTIVITY,
+            cls.COST_PER_KG,
+            cls.PREN
         ]
 
     @classmethod
@@ -247,9 +299,85 @@ class AlloyProperty(Enum):
             cls.TENSILE_STRENGTH,
             cls.YIELD_STRENGTH,
             cls.ELONGATION,
+            cls.REDUCTION_OF_AREA,
             cls.HARDNESS,
+            cls.HARDNESS_BRINELL,
+            cls.HARDNESS_VICKERS,
+            cls.IMPACT_STRENGTH,
+            cls.FATIGUE_STRENGTH,
+            cls.FRACTURE_TOUGHNESS,
             cls.THERMAL_CONDUCTIVITY,
-            cls.MELTING_POINT
+            cls.MELTING_POINT,
+            cls.PREN
+        ]
+
+    @classmethod
+    def get_color_properties(cls):
+        """Get ordered list of properties suitable for color encoding"""
+        return [
+            cls.NONE,
+            cls.DENSITY,
+            cls.MELTING_POINT,
+            cls.THERMAL_CONDUCTIVITY,
+            cls.THERMAL_EXPANSION,
+            cls.ELECTRICAL_RESISTIVITY,
+            cls.SPECIFIC_HEAT,
+            cls.TENSILE_STRENGTH,
+            cls.YIELD_STRENGTH,
+            cls.HARDNESS,
+            cls.HARDNESS_BRINELL,
+            cls.HARDNESS_VICKERS,
+            cls.HARDNESS_ROCKWELL,
+            cls.ELONGATION,
+            cls.REDUCTION_OF_AREA,
+            cls.YOUNGS_MODULUS,
+            cls.SHEAR_MODULUS,
+            cls.POISSONS_RATIO,
+            cls.IMPACT_STRENGTH,
+            cls.FATIGUE_STRENGTH,
+            cls.FRACTURE_TOUGHNESS,
+            cls.CORROSION_RESISTANCE,
+            cls.PREN,
+            cls.PITTING_POTENTIAL,
+            cls.COST_PER_KG
+        ]
+
+    @classmethod
+    def get_size_properties(cls):
+        """Get ordered list of properties suitable for size encoding"""
+        return [
+            cls.NONE,
+            cls.DENSITY,
+            cls.HARDNESS,
+            cls.HARDNESS_BRINELL,
+            cls.HARDNESS_VICKERS,
+            cls.TENSILE_STRENGTH,
+            cls.YIELD_STRENGTH,
+            cls.YOUNGS_MODULUS,
+            cls.SHEAR_MODULUS,
+            cls.MELTING_POINT,
+            cls.ELONGATION,
+            cls.IMPACT_STRENGTH,
+            cls.FRACTURE_TOUGHNESS,
+            cls.COST_PER_KG,
+            cls.PREN
+        ]
+
+    @classmethod
+    def get_intensity_properties(cls):
+        """Get ordered list of properties suitable for intensity/glow encoding"""
+        return [
+            cls.NONE,
+            cls.TENSILE_STRENGTH,
+            cls.YIELD_STRENGTH,
+            cls.HARDNESS,
+            cls.MELTING_POINT,
+            cls.THERMAL_CONDUCTIVITY,
+            cls.CORROSION_RESISTANCE,
+            cls.PREN,
+            cls.FATIGUE_STRENGTH,
+            cls.FRACTURE_TOUGHNESS,
+            cls.COST_PER_KG
         ]
 
 
