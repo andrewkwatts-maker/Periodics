@@ -9,13 +9,107 @@
 
 """
 Electron orbital probability cloud calculations.
-Supports visualization of different orbital states (n, l, m).
-Uses proper quantum mechanical wavefunctions with scipy special functions.
+Supports both scipy (high-performance) and pure Python (zero dependencies) backends.
 """
 import math
-import numpy as np
-from scipy.special import genlaguerre, lpmv, factorial
 
+# Backend selection - try scipy first, fall back to pure Python
+USE_SCIPY = True  # Set to False to force pure Python
+
+try:
+    if USE_SCIPY:
+        from scipy.special import genlaguerre as _scipy_genlaguerre
+        from scipy.special import lpmv as _scipy_lpmv
+        from scipy.special import factorial as _scipy_factorial
+        import numpy as np
+        _SCIPY_AVAILABLE = True
+    else:
+        _SCIPY_AVAILABLE = False
+except ImportError:
+    _SCIPY_AVAILABLE = False
+
+if not _SCIPY_AVAILABLE:
+    from utils.pure_math import genlaguerre as _pure_genlaguerre
+    from utils.pure_math import lpmv as _pure_lpmv
+    from utils.pure_math import factorial as _pure_factorial
+
+
+# =============================================================================
+# Unified API - Backend wrapper functions
+# =============================================================================
+
+def _factorial(n):
+    """Compute factorial using the active backend."""
+    if _SCIPY_AVAILABLE:
+        return float(_scipy_factorial(n))
+    return float(_pure_factorial(int(n)))
+
+
+def _genlaguerre(n, alpha):
+    """Return generalized Laguerre polynomial function using the active backend."""
+    if _SCIPY_AVAILABLE:
+        return _scipy_genlaguerre(n, alpha)
+    return _pure_genlaguerre(n, alpha)
+
+
+def _lpmv(m, l, x):
+    """Compute associated Legendre polynomial using the active backend."""
+    if _SCIPY_AVAILABLE:
+        return float(_scipy_lpmv(m, l, x))
+    return float(_pure_lpmv(m, l, x))
+
+
+# =============================================================================
+# Backend management functions
+# =============================================================================
+
+def set_backend(use_scipy: bool):
+    """
+    Switch between scipy and pure Python backends.
+
+    Args:
+        use_scipy: True to use scipy, False to use pure Python
+
+    Raises:
+        ImportError: If scipy is requested but not available
+    """
+    global USE_SCIPY, _SCIPY_AVAILABLE
+    global _scipy_genlaguerre, _scipy_lpmv, _scipy_factorial, np
+    global _pure_genlaguerre, _pure_lpmv, _pure_factorial
+
+    if use_scipy:
+        # Try to import scipy
+        try:
+            from scipy.special import genlaguerre as _scipy_genlaguerre
+            from scipy.special import lpmv as _scipy_lpmv
+            from scipy.special import factorial as _scipy_factorial
+            import numpy as np
+            _SCIPY_AVAILABLE = True
+            USE_SCIPY = True
+        except ImportError:
+            raise ImportError("scipy is not available")
+    else:
+        # Switch to pure Python
+        from utils.pure_math import genlaguerre as _pure_genlaguerre
+        from utils.pure_math import lpmv as _pure_lpmv
+        from utils.pure_math import factorial as _pure_factorial
+        _SCIPY_AVAILABLE = False
+        USE_SCIPY = False
+
+
+def get_backend() -> str:
+    """
+    Return the name of the current backend.
+
+    Returns:
+        "scipy" if using scipy backend, "pure_python" otherwise
+    """
+    return "scipy" if _SCIPY_AVAILABLE and USE_SCIPY else "pure_python"
+
+
+# =============================================================================
+# Orbital naming functions
+# =============================================================================
 
 def get_orbital_name(n, l, m=0):
     """
@@ -44,9 +138,13 @@ def get_orbital_name(n, l, m=0):
         return f"{n}{letter}{sub}"
 
 
+# =============================================================================
+# Quantum mechanical wavefunction calculations
+# =============================================================================
+
 def radial_wavefunction(n, l, r, Z=1):
     """
-    Proper radial wavefunction for hydrogen-like atoms using scipy.
+    Proper radial wavefunction for hydrogen-like atoms.
 
     Implements: R_{n,l}(r) = sqrt[(2Z/na₀)³ * (n-l-1)! / (2n[(n+l)!]³)] *
                               (2Zr/na₀)^l * exp(-Zr/na₀) * L_{n-l-1}^{2l+1}(2Zr/na₀)
@@ -67,25 +165,25 @@ def radial_wavefunction(n, l, r, Z=1):
     rho = 2.0 * Z * r / (n * a0)
 
     # Normalization constant
-    norm_factor = np.sqrt(
+    norm_factor = math.sqrt(
         (2.0 * Z / (n * a0))**3 *
-        factorial(n - l - 1) /
-        (2.0 * n * factorial(n + l)**3)
+        _factorial(n - l - 1) /
+        (2.0 * n * _factorial(n + l)**3)
     )
 
     # Associated Laguerre polynomial L_{n-l-1}^{2l+1}(rho)
-    laguerre_poly = genlaguerre(n - l - 1, 2 * l + 1)
+    laguerre_poly = _genlaguerre(n - l - 1, 2 * l + 1)
     laguerre_value = laguerre_poly(rho)
 
     # Radial wavefunction
-    R_nl = norm_factor * (rho**l) * np.exp(-rho / 2.0) * laguerre_value
+    R_nl = norm_factor * (rho**l) * math.exp(-rho / 2.0) * laguerre_value
 
     return float(R_nl)
 
 
 def angular_wavefunction(l, m, theta, phi=0):
     """
-    Proper angular wavefunction (spherical harmonics) using scipy.
+    Proper angular wavefunction (spherical harmonics).
 
     Implements: Y_{l,m}(θ,φ) using associated Legendre polynomials
 
@@ -102,13 +200,13 @@ def angular_wavefunction(l, m, theta, phi=0):
         return 0.0
 
     # Normalization constant for spherical harmonics
-    norm = np.sqrt(
-        (2 * l + 1) * factorial(l - abs(m)) /
-        (4 * np.pi * factorial(l + abs(m)))
+    norm = math.sqrt(
+        (2 * l + 1) * _factorial(l - abs(m)) /
+        (4 * math.pi * _factorial(l + abs(m)))
     )
 
     # Associated Legendre polynomial P_l^m(cos(theta))
-    legendre_value = lpmv(abs(m), l, np.cos(theta))
+    legendre_value = _lpmv(abs(m), l, math.cos(theta))
 
     # Spherical harmonic magnitude squared
     # |Y_{l,m}|² = |normalization * P_l^m * e^{imφ}|²
@@ -163,6 +261,10 @@ def get_available_orbitals(max_n=4):
 
     return orbitals
 
+
+# =============================================================================
+# Shell radius calculations
+# =============================================================================
 
 def get_bohr_radius_for_shell(n, Z=1):
     """

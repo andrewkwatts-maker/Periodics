@@ -9,7 +9,7 @@
 
 """
 SDF (Signed Distance Field) renderer for smooth particle visualization.
-Balances scientific accuracy with rendering performance.
+Supports both numpy (high-performance) and pure Python (zero dependencies) backends.
 
 Uses SDF-based techniques for:
 - Smooth particle falloff and anti-aliasing
@@ -17,9 +17,61 @@ Uses SDF-based techniques for:
 - Electron orbital probability clouds
 """
 import math
-import numpy as np
 from PySide6.QtGui import QImage, QColor, QPainter, QBrush, QRadialGradient
 from PySide6.QtCore import Qt, QPointF
+
+# Backend selection
+USE_NUMPY = True
+
+try:
+    if USE_NUMPY:
+        import numpy as np
+        _NUMPY_AVAILABLE = True
+    else:
+        _NUMPY_AVAILABLE = False
+except ImportError:
+    _NUMPY_AVAILABLE = False
+
+if not _NUMPY_AVAILABLE:
+    from utils.pure_array import (
+        Vec3, pi, sqrt, cos, sin,
+        random_seed, random_uniform,
+        generate_nucleon_positions
+    )
+
+
+def set_backend(use_numpy: bool):
+    """
+    Switch between numpy and pure Python backends.
+
+    Args:
+        use_numpy: True to use numpy backend, False for pure Python.
+
+    Note:
+        This function reloads the module to apply the backend change.
+        The change affects subsequent operations, not cached data.
+    """
+    global USE_NUMPY, _NUMPY_AVAILABLE
+    USE_NUMPY = use_numpy
+
+    if use_numpy:
+        try:
+            import numpy as np
+            _NUMPY_AVAILABLE = True
+        except ImportError:
+            _NUMPY_AVAILABLE = False
+    else:
+        _NUMPY_AVAILABLE = False
+
+
+def get_backend() -> str:
+    """
+    Return current backend name.
+
+    Returns:
+        "numpy" if using numpy backend, "pure_python" otherwise.
+    """
+    return "numpy" if _NUMPY_AVAILABLE and USE_NUMPY else "pure_python"
 
 
 class SDFRenderer:
@@ -139,15 +191,18 @@ class SDFRenderer:
         # R = r0 * A^(1/3) where r0 ≈ 1.25 fm
         nuclear_radius = base_radius * (A ** (1/3)) / 6.0
 
-        # Random but deterministic positions for nucleons
-        np.random.seed(protons * 1000 + neutrons)  # Consistent for same isotope
-
         # Place nucleons in a roughly spherical arrangement
         nucleon_radius = max(2, nuclear_radius / max(1, (A ** (1/3))) * 0.8)
 
-        # Pre-calculate rotation
-        cos_rx, sin_rx = np.cos(rotation_x), np.sin(rotation_x)
-        cos_ry, sin_ry = np.cos(rotation_y), np.sin(rotation_y)
+        # Select backend-specific implementation
+        if _NUMPY_AVAILABLE and USE_NUMPY:
+            nucleon_data = cls._generate_nucleons_numpy(
+                protons, neutrons, nuclear_radius, rotation_x, rotation_y
+            )
+        else:
+            nucleon_data = cls._generate_nucleons_pure(
+                protons, neutrons, nuclear_radius, rotation_x, rotation_y
+            )
 
         # Draw nucleus boundary (subtle)
         from PySide6.QtGui import QPen
@@ -155,7 +210,55 @@ class SDFRenderer:
         painter.setBrush(QBrush(QColor(40, 40, 60, 30)))
         painter.drawEllipse(QPointF(cx, cy), nuclear_radius * 1.2, nuclear_radius * 1.2)
 
-        # Collect nucleon data for depth sorting
+        # Sort by depth (back to front)
+        nucleon_data.sort(key=lambda n: n[2])
+
+        # Draw nucleons from back to front
+        for dx2, dy2, dz3, is_proton in nucleon_data:
+            # Project to 2D with depth-based scaling
+            depth_scale = 1.0 / (1.0 + dz3 / (nuclear_radius * 3 + 1))
+            px = cx + dx2 * depth_scale
+            py = cy + dy2 * depth_scale
+
+            # Depth-based alpha for 3D effect
+            depth_alpha = 0.4 + 0.6 * (1 + dz3 / (nuclear_radius + 1)) / 2
+            depth_alpha = max(0.3, min(1.0, depth_alpha))
+
+            # Draw nucleon with SDF-style gradient
+            color = QColor(255, 100, 100) if is_proton else QColor(150, 170, 220)
+            cls.draw_sdf_particle(painter, px, py, nucleon_radius * depth_scale,
+                                 color, softness=nucleon_radius * 0.5, intensity=depth_alpha)
+
+        # Draw legend if requested
+        if show_legend:
+            cls._draw_nucleus_legend(painter, cx, cy, protons, neutrons,
+                                    nuclear_radius, nucleon_radius)
+
+    @classmethod
+    def _generate_nucleons_numpy(cls, protons, neutrons, nuclear_radius, rotation_x, rotation_y):
+        """
+        Generate nucleon positions using numpy backend.
+
+        Args:
+            protons: Number of protons
+            neutrons: Number of neutrons
+            nuclear_radius: Radius of the nucleus
+            rotation_x, rotation_y: 3D rotation angles
+
+        Returns:
+            List of tuples (dx2, dy2, dz3, is_proton) for each nucleon
+        """
+        import numpy as np
+
+        A = protons + neutrons
+
+        # Random but deterministic positions for nucleons
+        np.random.seed(protons * 1000 + neutrons)  # Consistent for same isotope
+
+        # Pre-calculate rotation
+        cos_rx, sin_rx = np.cos(rotation_x), np.sin(rotation_x)
+        cos_ry, sin_ry = np.cos(rotation_y), np.sin(rotation_y)
+
         nucleon_data = []
 
         for i in range(protons + neutrons):
@@ -184,29 +287,65 @@ class SDFRenderer:
 
             nucleon_data.append((dx2, dy2, dz3, is_proton))
 
-        # Sort by depth (back to front)
-        nucleon_data.sort(key=lambda n: n[2])
+        return nucleon_data
 
-        # Draw nucleons from back to front
-        for dx2, dy2, dz3, is_proton in nucleon_data:
-            # Project to 2D with depth-based scaling
-            depth_scale = 1.0 / (1.0 + dz3 / (nuclear_radius * 3 + 1))
-            px = cx + dx2 * depth_scale
-            py = cy + dy2 * depth_scale
+    @classmethod
+    def _generate_nucleons_pure(cls, protons, neutrons, nuclear_radius, rotation_x, rotation_y):
+        """
+        Generate nucleon positions using pure Python backend.
 
-            # Depth-based alpha for 3D effect
-            depth_alpha = 0.4 + 0.6 * (1 + dz3 / (nuclear_radius + 1)) / 2
-            depth_alpha = max(0.3, min(1.0, depth_alpha))
+        Args:
+            protons: Number of protons
+            neutrons: Number of neutrons
+            nuclear_radius: Radius of the nucleus
+            rotation_x, rotation_y: 3D rotation angles
 
-            # Draw nucleon with SDF-style gradient
-            color = QColor(255, 100, 100) if is_proton else QColor(150, 170, 220)
-            cls.draw_sdf_particle(painter, px, py, nucleon_radius * depth_scale,
-                                 color, softness=nucleon_radius * 0.5, intensity=depth_alpha)
+        Returns:
+            List of tuples (dx2, dy2, dz3, is_proton) for each nucleon
+        """
+        from utils.pure_array import (
+            pi, sqrt, cos, sin,
+            random_seed, random_uniform
+        )
 
-        # Draw legend if requested
-        if show_legend:
-            cls._draw_nucleus_legend(painter, cx, cy, protons, neutrons,
-                                    nuclear_radius, nucleon_radius)
+        A = protons + neutrons
+
+        # Random but deterministic positions for nucleons
+        random_seed(protons * 1000 + neutrons)  # Consistent for same isotope
+
+        # Pre-calculate rotation
+        cos_rx, sin_rx = cos(rotation_x), sin(rotation_x)
+        cos_ry, sin_ry = cos(rotation_y), sin(rotation_y)
+
+        nucleon_data = []
+
+        for i in range(protons + neutrons):
+            is_proton = i < protons
+
+            # Spherical placement with some randomness
+            if A == 1:
+                dx, dy, dz = 0, 0, 0
+            else:
+                phi = random_uniform(0, 2 * pi)
+                cos_theta = random_uniform(-1, 1)
+                sin_theta = sqrt(1 - cos_theta**2)
+                r = nuclear_radius * 0.7 * random_uniform(0.3, 1.0)
+
+                dx = r * sin_theta * cos(phi)
+                dy = r * sin_theta * sin(phi)
+                dz = r * cos_theta
+
+            # Apply 3D rotation - rotate around X axis
+            dy2 = dy * cos_rx - dz * sin_rx
+            dz2 = dy * sin_rx + dz * cos_rx
+
+            # Rotate around Y axis
+            dx2 = dx * cos_ry + dz2 * sin_ry
+            dz3 = -dx * sin_ry + dz2 * cos_ry
+
+            nucleon_data.append((dx2, dy2, dz3, is_proton))
+
+        return nucleon_data
 
     @classmethod
     def _draw_nucleus_legend(cls, painter, cx, cy, protons, neutrons,
