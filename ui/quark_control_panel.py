@@ -87,6 +87,10 @@ class QuarkControlPanel(QWidget):
         self.linear_radio = QRadioButton("Linear (Sorted)")
         self.circular_radio = QRadioButton("Circular (Rings)")
         self.alternative_radio = QRadioButton("By Interaction Force")
+        self.force_network_radio = QRadioButton("Force Network")
+        self.mass_spiral_radio = QRadioButton("Mass Spiral")
+        self.fermion_boson_radio = QRadioButton("Fermion/Boson Split")
+        self.charge_mass_radio = QRadioButton("Charge-Mass Grid")
         self.standard_radio.setChecked(True)
 
         radio_style = self._get_radio_style()
@@ -94,6 +98,10 @@ class QuarkControlPanel(QWidget):
         self.linear_radio.setStyleSheet(radio_style)
         self.circular_radio.setStyleSheet(radio_style)
         self.alternative_radio.setStyleSheet(radio_style)
+        self.force_network_radio.setStyleSheet(radio_style)
+        self.mass_spiral_radio.setStyleSheet(radio_style)
+        self.fermion_boson_radio.setStyleSheet(radio_style)
+        self.charge_mass_radio.setStyleSheet(radio_style)
 
         self.standard_radio.toggled.connect(
             lambda checked: self._on_layout_changed(QuarkLayoutMode.STANDARD_MODEL) if checked else None)
@@ -103,11 +111,23 @@ class QuarkControlPanel(QWidget):
             lambda checked: self._on_layout_changed(QuarkLayoutMode.CIRCULAR) if checked else None)
         self.alternative_radio.toggled.connect(
             lambda checked: self._on_layout_changed(QuarkLayoutMode.ALTERNATIVE) if checked else None)
+        self.force_network_radio.toggled.connect(
+            lambda checked: self._on_layout_changed(QuarkLayoutMode.FORCE_NETWORK) if checked else None)
+        self.mass_spiral_radio.toggled.connect(
+            lambda checked: self._on_layout_changed(QuarkLayoutMode.MASS_SPIRAL) if checked else None)
+        self.fermion_boson_radio.toggled.connect(
+            lambda checked: self._on_layout_changed(QuarkLayoutMode.FERMION_BOSON) if checked else None)
+        self.charge_mass_radio.toggled.connect(
+            lambda checked: self._on_layout_changed(QuarkLayoutMode.CHARGE_MASS) if checked else None)
 
         layout.addWidget(self.standard_radio)
         layout.addWidget(self.linear_radio)
         layout.addWidget(self.circular_radio)
         layout.addWidget(self.alternative_radio)
+        layout.addWidget(self.force_network_radio)
+        layout.addWidget(self.mass_spiral_radio)
+        layout.addWidget(self.fermion_boson_radio)
+        layout.addWidget(self.charge_mass_radio)
 
         # Sort property for linear mode
         self.sort_container = QWidget()

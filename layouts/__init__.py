@@ -22,6 +22,10 @@ from layouts.molecule_mass_layout import MoleculeMassLayout
 from layouts.molecule_polarity_layout import MoleculePolarityLayout
 from layouts.molecule_bond_layout import MoleculeBondLayout
 from layouts.molecule_geometry_layout import MoleculeGeometryLayout
+from layouts.molecule_phase_diagram_layout import MoleculePhaseDiagramLayout
+from layouts.molecule_dipole_layout import MoleculeDipoleLayout
+from layouts.molecule_density_layout import MoleculeDensityLayout
+from layouts.molecule_bond_complexity_layout import MoleculeBondComplexityLayout
 
 # Quark/Particle layouts
 from layouts.quark_base_layout import QuarkBaseLayoutRenderer
@@ -35,6 +39,10 @@ from layouts.subatomic_baryon_meson_layout import SubatomicBaryonMesonLayout
 from layouts.subatomic_mass_layout import SubatomicMassLayout
 from layouts.subatomic_charge_layout import SubatomicChargeLayout
 from layouts.subatomic_decay_layout import SubatomicDecayLayout
+from layouts.subatomic_eightfold_layout import SubatomicEightfoldLayout
+from layouts.subatomic_lifetime_layout import SubatomicLifetimeLayout
+from layouts.subatomic_quark_tree_layout import SubatomicQuarkTreeLayout
+from layouts.subatomic_discovery_layout import SubatomicDiscoveryLayout
 
 __all__ = [
     'BaseLayoutRenderer',
@@ -47,6 +55,10 @@ __all__ = [
     'MoleculePolarityLayout',
     'MoleculeBondLayout',
     'MoleculeGeometryLayout',
+    'MoleculePhaseDiagramLayout',
+    'MoleculeDipoleLayout',
+    'MoleculeDensityLayout',
+    'MoleculeBondComplexityLayout',
     # Quark layouts
     'QuarkBaseLayoutRenderer',
     'QuarkStandardLayoutRenderer',
@@ -57,5 +69,9 @@ __all__ = [
     'SubatomicBaryonMesonLayout',
     'SubatomicMassLayout',
     'SubatomicChargeLayout',
-    'SubatomicDecayLayout'
+    'SubatomicDecayLayout',
+    'SubatomicEightfoldLayout',
+    'SubatomicLifetimeLayout',
+    'SubatomicQuarkTreeLayout',
+    'SubatomicDiscoveryLayout'
 ]

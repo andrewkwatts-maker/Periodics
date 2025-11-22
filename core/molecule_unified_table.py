@@ -18,6 +18,10 @@ from layouts.molecule_mass_layout import MoleculeMassLayout
 from layouts.molecule_polarity_layout import MoleculePolarityLayout
 from layouts.molecule_bond_layout import MoleculeBondLayout
 from layouts.molecule_geometry_layout import MoleculeGeometryLayout
+from layouts.molecule_phase_diagram_layout import MoleculePhaseDiagramLayout
+from layouts.molecule_dipole_layout import MoleculeDipoleLayout
+from layouts.molecule_density_layout import MoleculeDensityLayout
+from layouts.molecule_bond_complexity_layout import MoleculeBondComplexityLayout
 
 
 class MoleculeUnifiedTable(QWidget):
@@ -59,6 +63,10 @@ class MoleculeUnifiedTable(QWidget):
             MoleculeLayoutMode.POLARITY: MoleculePolarityLayout(self.width(), self.height()),
             MoleculeLayoutMode.BOND_TYPE: MoleculeBondLayout(self.width(), self.height()),
             MoleculeLayoutMode.GEOMETRY: MoleculeGeometryLayout(self.width(), self.height()),
+            MoleculeLayoutMode.PHASE_DIAGRAM: MoleculePhaseDiagramLayout(self.width(), self.height()),
+            MoleculeLayoutMode.DIPOLE: MoleculeDipoleLayout(self.width(), self.height()),
+            MoleculeLayoutMode.DENSITY: MoleculeDensityLayout(self.width(), self.height()),
+            MoleculeLayoutMode.BOND_COMPLEXITY: MoleculeBondComplexityLayout(self.width(), self.height()),
         }
 
         # Initialize layout
@@ -135,7 +143,9 @@ class MoleculeUnifiedTable(QWidget):
 
         # Draw group headers if applicable
         if self.layout_mode in [MoleculeLayoutMode.POLARITY, MoleculeLayoutMode.BOND_TYPE,
-                                MoleculeLayoutMode.GEOMETRY]:
+                                MoleculeLayoutMode.GEOMETRY, MoleculeLayoutMode.PHASE_DIAGRAM,
+                                MoleculeLayoutMode.DIPOLE, MoleculeLayoutMode.DENSITY,
+                                MoleculeLayoutMode.BOND_COMPLEXITY]:
             self._draw_group_headers(painter)
 
         # Draw molecules

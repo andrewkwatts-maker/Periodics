@@ -1,6 +1,6 @@
 """
-Molecule Control Panel
-Provides UI controls for molecule visualization settings.
+Alloy Control Panel
+Provides UI controls for alloy visualization settings.
 """
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox,
@@ -9,12 +9,12 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroup
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
 
-from core.molecule_enums import MoleculeLayoutMode, MoleculeCategory, MoleculePolarity, MoleculeState
+from core.alloy_enums import AlloyLayoutMode, AlloyCategory, CrystalStructure, AlloyProperty
 from data.data_manager import get_data_manager, DataCategory
 
 
-class MoleculeControlPanel(QWidget):
-    """Control panel for molecule visualization settings"""
+class AlloyControlPanel(QWidget):
+    """Control panel for alloy visualization settings"""
 
     # Data management signals
     add_requested = Signal()
@@ -40,7 +40,7 @@ class MoleculeControlPanel(QWidget):
                 border-radius: 5px;
             }
             QScrollBar::handle:vertical {
-                background: rgba(79, 195, 247, 150);
+                background: rgba(176, 130, 100, 150);
                 border-radius: 5px;
             }
         """)
@@ -50,9 +50,9 @@ class MoleculeControlPanel(QWidget):
         layout.setContentsMargins(15, 15, 15, 15)
         layout.setSpacing(15)
 
-        title = QLabel("Molecule Controls")
+        title = QLabel("Alloy Controls")
         title.setFont(QFont("Arial", 14, QFont.Weight.Bold))
-        title.setStyleSheet("color: #4fc3f7;")
+        title.setStyleSheet("color: #B08264;")
         layout.addWidget(title)
 
         # Layout Mode Selection
@@ -61,11 +61,16 @@ class MoleculeControlPanel(QWidget):
         # Category Filter
         layout.addWidget(self._create_category_filter_group())
 
-        # Polarity Filter
-        layout.addWidget(self._create_polarity_filter_group())
+        # Structure Filter
+        layout.addWidget(self._create_structure_filter_group())
 
-        # State Filter
-        layout.addWidget(self._create_state_filter_group())
+        # Primary Element Filter
+        layout.addWidget(self._create_element_filter_group())
+
+        # Scatter Plot Settings (only visible in scatter mode)
+        self.scatter_group = self._create_scatter_settings_group()
+        layout.addWidget(self.scatter_group)
+        self.scatter_group.setVisible(False)
 
         # View Controls
         layout.addWidget(self._create_view_controls_group())
@@ -84,37 +89,26 @@ class MoleculeControlPanel(QWidget):
     def _create_layout_mode_group(self):
         """Create layout mode selection group"""
         group = QGroupBox("Layout Mode")
-        group.setStyleSheet(self._get_group_style("#667eea"))
+        group.setStyleSheet(self._get_group_style("#B08264"))
         layout = QVBoxLayout()
 
-        self.grid_radio = QRadioButton("Grid View")
-        self.mass_radio = QRadioButton("Mass Order")
-        self.polarity_radio = QRadioButton("By Polarity")
-        self.bond_radio = QRadioButton("By Bond Type")
-        self.geometry_radio = QRadioButton("By Geometry")
-        self.phase_diagram_radio = QRadioButton("Phase Diagram")
-        self.dipole_radio = QRadioButton("Dipole-Polarity")
-        self.density_radio = QRadioButton("Density-Mass")
-        self.bond_complexity_radio = QRadioButton("Bond Complexity")
+        self.category_radio = QRadioButton("By Category")
+        self.scatter_radio = QRadioButton("Property Plot")
+        self.composition_radio = QRadioButton("By Primary Element")
+        self.lattice_radio = QRadioButton("By Crystal Structure")
 
-        self.grid_radio.setChecked(True)
+        self.category_radio.setChecked(True)
 
         radio_style = self._get_radio_style()
-        for radio in [self.grid_radio, self.mass_radio, self.polarity_radio,
-                      self.bond_radio, self.geometry_radio, self.phase_diagram_radio,
-                      self.dipole_radio, self.density_radio, self.bond_complexity_radio]:
+        for radio in [self.category_radio, self.scatter_radio,
+                      self.composition_radio, self.lattice_radio]:
             radio.setStyleSheet(radio_style)
             layout.addWidget(radio)
 
-        self.grid_radio.toggled.connect(lambda: self._on_layout_changed("grid") if self.grid_radio.isChecked() else None)
-        self.mass_radio.toggled.connect(lambda: self._on_layout_changed("mass_order") if self.mass_radio.isChecked() else None)
-        self.polarity_radio.toggled.connect(lambda: self._on_layout_changed("polarity") if self.polarity_radio.isChecked() else None)
-        self.bond_radio.toggled.connect(lambda: self._on_layout_changed("bond_type") if self.bond_radio.isChecked() else None)
-        self.geometry_radio.toggled.connect(lambda: self._on_layout_changed("geometry") if self.geometry_radio.isChecked() else None)
-        self.phase_diagram_radio.toggled.connect(lambda: self._on_layout_changed("phase_diagram") if self.phase_diagram_radio.isChecked() else None)
-        self.dipole_radio.toggled.connect(lambda: self._on_layout_changed("dipole") if self.dipole_radio.isChecked() else None)
-        self.density_radio.toggled.connect(lambda: self._on_layout_changed("density") if self.density_radio.isChecked() else None)
-        self.bond_complexity_radio.toggled.connect(lambda: self._on_layout_changed("bond_complexity") if self.bond_complexity_radio.isChecked() else None)
+        self.category_radio.toggled.connect(lambda: self._on_layout_changed("category") if self.category_radio.isChecked() else None)
+        self.scatter_radio.toggled.connect(lambda: self._on_layout_changed("property_scatter") if self.scatter_radio.isChecked() else None)
+        self.composition_radio.toggled.connect(lambda: self._on_layout_changed("composition") if self.composition_radio.isChecked() else None)
+        self.lattice_radio.toggled.connect(lambda: self._on_layout_changed("lattice") if self.lattice_radio.isChecked() else None)
 
         group.setLayout(layout)
         return group
@@ -122,14 +116,17 @@ class MoleculeControlPanel(QWidget):
     def _create_category_filter_group(self):
         """Create category filter group"""
         group = QGroupBox("Category Filter")
-        group.setStyleSheet(self._get_group_style("#8BC34A"))
+        group.setStyleSheet(self._get_group_style("#607D8B"))
         layout = QVBoxLayout()
 
         self.category_combo = QComboBox()
         self.category_combo.addItem("All Categories", None)
-        self.category_combo.addItem("Organic", "Organic")
-        self.category_combo.addItem("Inorganic", "Inorganic")
-        self.category_combo.addItem("Ionic", "Ionic")
+
+        # Add standard categories
+        for cat in ['Steel', 'Aluminum', 'Bronze', 'Brass', 'Copper',
+                    'Titanium', 'Nickel', 'Superalloy', 'Precious', 'Solder']:
+            self.category_combo.addItem(cat, cat)
+
         self.category_combo.setStyleSheet(self._get_combo_style())
         self.category_combo.currentIndexChanged.connect(self._on_category_changed)
 
@@ -137,46 +134,78 @@ class MoleculeControlPanel(QWidget):
         group.setLayout(layout)
         return group
 
-    def _create_polarity_filter_group(self):
-        """Create polarity filter group"""
-        group = QGroupBox("Polarity Filter")
-        group.setStyleSheet(self._get_group_style("#2196F3"))
+    def _create_structure_filter_group(self):
+        """Create crystal structure filter group"""
+        group = QGroupBox("Crystal Structure")
+        group.setStyleSheet(self._get_group_style("#4CAF50"))
         layout = QVBoxLayout()
 
-        self.polarity_combo = QComboBox()
-        self.polarity_combo.addItem("All Polarities", None)
-        self.polarity_combo.addItem("Polar", "Polar")
-        self.polarity_combo.addItem("Nonpolar", "Nonpolar")
-        self.polarity_combo.addItem("Ionic", "Ionic")
-        self.polarity_combo.setStyleSheet(self._get_combo_style())
-        self.polarity_combo.currentIndexChanged.connect(self._on_polarity_changed)
+        self.structure_combo = QComboBox()
+        self.structure_combo.addItem("All Structures", None)
 
-        layout.addWidget(self.polarity_combo)
+        for struct in ['FCC', 'BCC', 'HCP', 'BCT', 'Mixed']:
+            color = CrystalStructure.get_color(struct)
+            self.structure_combo.addItem(struct, struct)
+
+        self.structure_combo.setStyleSheet(self._get_combo_style())
+        self.structure_combo.currentIndexChanged.connect(self._on_structure_changed)
+
+        layout.addWidget(self.structure_combo)
         group.setLayout(layout)
         return group
 
-    def _create_state_filter_group(self):
-        """Create state filter group"""
-        group = QGroupBox("State Filter")
+    def _create_element_filter_group(self):
+        """Create primary element filter group"""
+        group = QGroupBox("Primary Element")
+        group.setStyleSheet(self._get_group_style("#2196F3"))
+        layout = QVBoxLayout()
+
+        self.element_combo = QComboBox()
+        self.element_combo.addItem("All Elements", None)
+
+        # Common base elements
+        for elem in ['Fe', 'Al', 'Cu', 'Ti', 'Ni', 'Sn', 'Ag', 'Au']:
+            self.element_combo.addItem(elem, elem)
+
+        self.element_combo.setStyleSheet(self._get_combo_style())
+        self.element_combo.currentIndexChanged.connect(self._on_element_changed)
+
+        layout.addWidget(self.element_combo)
+        group.setLayout(layout)
+        return group
+
+    def _create_scatter_settings_group(self):
+        """Create scatter plot settings group"""
+        group = QGroupBox("Property Axes")
         group.setStyleSheet(self._get_group_style("#FF9800"))
         layout = QVBoxLayout()
 
-        self.state_combo = QComboBox()
-        self.state_combo.addItem("All States", None)
-        self.state_combo.addItem("Solid", "Solid")
-        self.state_combo.addItem("Liquid", "Liquid")
-        self.state_combo.addItem("Gas", "Gas")
-        self.state_combo.setStyleSheet(self._get_combo_style())
-        self.state_combo.currentIndexChanged.connect(self._on_state_changed)
+        # X axis property
+        layout.addWidget(QLabel("X Axis:"))
+        self.x_prop_combo = QComboBox()
+        for prop in AlloyProperty.get_scatter_x_properties():
+            self.x_prop_combo.addItem(AlloyProperty.get_display_name(prop), prop.value)
+        self.x_prop_combo.setStyleSheet(self._get_combo_style())
+        self.x_prop_combo.currentIndexChanged.connect(self._on_scatter_prop_changed)
+        layout.addWidget(self.x_prop_combo)
 
-        layout.addWidget(self.state_combo)
+        # Y axis property
+        layout.addWidget(QLabel("Y Axis:"))
+        self.y_prop_combo = QComboBox()
+        for prop in AlloyProperty.get_scatter_y_properties():
+            self.y_prop_combo.addItem(AlloyProperty.get_display_name(prop), prop.value)
+        self.y_prop_combo.setCurrentIndex(0)  # Default to tensile strength
+        self.y_prop_combo.setStyleSheet(self._get_combo_style())
+        self.y_prop_combo.currentIndexChanged.connect(self._on_scatter_prop_changed)
+        layout.addWidget(self.y_prop_combo)
+
         group.setLayout(layout)
         return group
 
     def _create_view_controls_group(self):
         """Create view control buttons"""
         group = QGroupBox("View Controls")
-        group.setStyleSheet(self._get_group_style("#f093fb"))
+        group.setStyleSheet(self._get_group_style("#9C27B0"))
         layout = QVBoxLayout()
 
         # Reset view button
@@ -184,7 +213,7 @@ class MoleculeControlPanel(QWidget):
         reset_btn.setStyleSheet("""
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #667eea, stop:1 #764ba2);
+                    stop:0 #B08264, stop:1 #8B6547);
                 color: white;
                 border: none;
                 border-radius: 5px;
@@ -193,7 +222,7 @@ class MoleculeControlPanel(QWidget):
             }
             QPushButton:hover {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #7688f0, stop:1 #8658b8);
+                    stop:0 #C09274, stop:1 #9B7557);
             }
         """)
         reset_btn.clicked.connect(self._on_reset_view)
@@ -225,89 +254,6 @@ class MoleculeControlPanel(QWidget):
 
         group.setLayout(layout)
         return group
-
-    def _on_layout_changed(self, mode):
-        """Handle layout mode change"""
-        self.table.set_layout_mode(mode)
-
-    def _on_category_changed(self, index):
-        """Handle category filter change"""
-        category = self.category_combo.itemData(index)
-        self.table.set_category_filter(category)
-
-    def _on_polarity_changed(self, index):
-        """Handle polarity filter change"""
-        polarity = self.polarity_combo.itemData(index)
-        self.table.set_polarity_filter(polarity)
-
-    def _on_state_changed(self, index):
-        """Handle state filter change"""
-        state = self.state_combo.itemData(index)
-        self.table.set_state_filter(state)
-
-    def _on_reset_view(self):
-        """Reset view to defaults"""
-        self.table.reset_view()
-
-    def _on_clear_filters(self):
-        """Clear all filters"""
-        self.category_combo.setCurrentIndex(0)
-        self.polarity_combo.setCurrentIndex(0)
-        self.state_combo.setCurrentIndex(0)
-
-    def _get_group_style(self, color):
-        return f"""
-            QGroupBox {{
-                color: white;
-                border: 2px solid {color};
-                border-radius: 8px;
-                margin-top: 10px;
-                padding: 10px;
-                font-weight: bold;
-            }}
-            QGroupBox::title {{
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px;
-            }}
-        """
-
-    def _get_radio_style(self):
-        return """
-            QRadioButton {
-                color: white;
-                spacing: 8px;
-            }
-            QRadioButton::indicator {
-                width: 16px;
-                height: 16px;
-                border: 2px solid #667eea;
-                border-radius: 8px;
-                background: rgba(40, 40, 60, 200);
-            }
-            QRadioButton::indicator:checked {
-                background: qradialgradient(cx:0.5, cy:0.5, radius:0.5,
-                    fx:0.5, fy:0.5, stop:0 #667eea, stop:1 rgba(102, 126, 234, 100));
-            }
-        """
-
-    def _get_combo_style(self):
-        return """
-            QComboBox {
-                background: rgba(40, 40, 60, 200);
-                color: white;
-                border: 1px solid #764ba2;
-                padding: 5px 10px;
-                border-radius: 5px;
-                font-size: 11px;
-            }
-            QComboBox::drop-down { border: none; }
-            QComboBox QAbstractItemView {
-                background: rgba(30, 30, 50, 250);
-                color: white;
-                selection-background-color: #764ba2;
-            }
-        """
 
     def _create_data_management_group(self):
         """Create data management controls group"""
@@ -356,18 +302,18 @@ class MoleculeControlPanel(QWidget):
 
         layout.addLayout(btn_layout)
 
-        # Create button (for creating from sub-components)
-        self.create_btn = QPushButton("Create from Atoms")
+        # Create button (for creating from elements)
+        self.create_btn = QPushButton("Create from Elements")
         self.create_btn.setStyleSheet("""
             QPushButton {
-                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #667eea, stop:1 #764ba2);
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #B08264, stop:1 #8B6547);
                 color: white;
                 padding: 8px;
                 border-radius: 4px;
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #764ba2, stop:1 #667eea);
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #8B6547, stop:1 #B08264);
             }
         """)
         self.create_btn.clicked.connect(self.create_requested.emit)
@@ -401,6 +347,97 @@ class MoleculeControlPanel(QWidget):
 
         group.setLayout(layout)
         return group
+
+    def _on_layout_changed(self, mode):
+        """Handle layout mode change"""
+        self.table.set_layout_mode(mode)
+        # Show/hide scatter settings
+        self.scatter_group.setVisible(mode == "property_scatter")
+
+    def _on_category_changed(self, index):
+        """Handle category filter change"""
+        category = self.category_combo.itemData(index)
+        self.table.set_category_filter(category)
+
+    def _on_structure_changed(self, index):
+        """Handle structure filter change"""
+        structure = self.structure_combo.itemData(index)
+        self.table.set_structure_filter(structure)
+
+    def _on_element_changed(self, index):
+        """Handle element filter change"""
+        element = self.element_combo.itemData(index)
+        self.table.set_element_filter(element)
+
+    def _on_scatter_prop_changed(self):
+        """Handle scatter property change"""
+        x_prop = self.x_prop_combo.currentData()
+        y_prop = self.y_prop_combo.currentData()
+        self.table.set_scatter_properties(x_prop, y_prop)
+
+    def _on_reset_view(self):
+        """Reset view to defaults"""
+        self.table.reset_view()
+
+    def _on_clear_filters(self):
+        """Clear all filters"""
+        self.category_combo.setCurrentIndex(0)
+        self.structure_combo.setCurrentIndex(0)
+        self.element_combo.setCurrentIndex(0)
+
+    def _get_group_style(self, color):
+        return f"""
+            QGroupBox {{
+                color: white;
+                border: 2px solid {color};
+                border-radius: 8px;
+                margin-top: 10px;
+                padding: 10px;
+                font-weight: bold;
+            }}
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px;
+            }}
+        """
+
+    def _get_radio_style(self):
+        return """
+            QRadioButton {
+                color: white;
+                spacing: 8px;
+            }
+            QRadioButton::indicator {
+                width: 16px;
+                height: 16px;
+                border: 2px solid #B08264;
+                border-radius: 8px;
+                background: rgba(40, 40, 60, 200);
+            }
+            QRadioButton::indicator:checked {
+                background: qradialgradient(cx:0.5, cy:0.5, radius:0.5,
+                    fx:0.5, fy:0.5, stop:0 #B08264, stop:1 rgba(176, 130, 100, 100));
+            }
+        """
+
+    def _get_combo_style(self):
+        return """
+            QComboBox {
+                background: rgba(40, 40, 60, 200);
+                color: white;
+                border: 1px solid #8B6547;
+                padding: 5px 10px;
+                border-radius: 5px;
+                font-size: 11px;
+            }
+            QComboBox::drop-down { border: none; }
+            QComboBox QAbstractItemView {
+                background: rgba(30, 30, 50, 250);
+                color: white;
+                selection-background-color: #8B6547;
+            }
+        """
 
     def set_item_selected(self, selected):
         """Enable/disable edit and remove buttons based on selection state"""

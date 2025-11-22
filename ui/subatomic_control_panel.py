@@ -142,11 +142,35 @@ class SubatomicControlPanel(QWidget):
         self.quark_radio.toggled.connect(
             lambda: self._on_layout_changed(SubatomicLayoutMode.QUARK_CONTENT) if self.quark_radio.isChecked() else None)
 
+        self.eightfold_radio = QRadioButton("Eightfold Way")
+        self.eightfold_radio.setStyleSheet(radio_style)
+        self.eightfold_radio.toggled.connect(
+            lambda: self._on_layout_changed(SubatomicLayoutMode.EIGHTFOLD_WAY) if self.eightfold_radio.isChecked() else None)
+
+        self.lifetime_radio = QRadioButton("Lifetime Spectrum")
+        self.lifetime_radio.setStyleSheet(radio_style)
+        self.lifetime_radio.toggled.connect(
+            lambda: self._on_layout_changed(SubatomicLayoutMode.LIFETIME_SPECTRUM) if self.lifetime_radio.isChecked() else None)
+
+        self.quark_tree_radio = QRadioButton("Quark Tree")
+        self.quark_tree_radio.setStyleSheet(radio_style)
+        self.quark_tree_radio.toggled.connect(
+            lambda: self._on_layout_changed(SubatomicLayoutMode.QUARK_TREE) if self.quark_tree_radio.isChecked() else None)
+
+        self.discovery_radio = QRadioButton("Discovery Timeline")
+        self.discovery_radio.setStyleSheet(radio_style)
+        self.discovery_radio.toggled.connect(
+            lambda: self._on_layout_changed(SubatomicLayoutMode.DISCOVERY_TIMELINE) if self.discovery_radio.isChecked() else None)
+
         layout_box.addWidget(self.baryon_meson_radio)
         layout_box.addWidget(self.mass_radio)
         layout_box.addWidget(self.charge_radio)
         layout_box.addWidget(self.decay_radio)
         layout_box.addWidget(self.quark_radio)
+        layout_box.addWidget(self.eightfold_radio)
+        layout_box.addWidget(self.lifetime_radio)
+        layout_box.addWidget(self.quark_tree_radio)
+        layout_box.addWidget(self.discovery_radio)
 
         layout_group.setLayout(layout_box)
         return layout_group
