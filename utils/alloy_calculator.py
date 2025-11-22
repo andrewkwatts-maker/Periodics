@@ -333,42 +333,142 @@ class AlloyCalculator:
                            density: float) -> Dict:
         """
         Estimate mechanical properties using empirical correlations.
+
+        Improved model includes:
+        - Base strength from alloy category
+        - Solid solution strengthening
+        - Precipitation/phase strengthening
+        - Alloy-specific empirical factors
         """
-        # Base strength from density correlation
-        # Higher density metals tend to have higher strength
-        base_strength = 100 + density * 40
+        # Get element percentages for calculations
+        elem_pct = {elem: wf * 100 for elem, wf in zip(elements, weight_fractions)}
+
+        # Determine primary element and alloy category
+        max_idx = weight_fractions.index(max(weight_fractions))
+        primary = elements[max_idx]
+
+        # Base strength varies by alloy system (MPa)
+        # Reference values for annealed condition
+        base_strengths = {
+            'Fe': 280,   # Low carbon steel base
+            'Al': 90,    # Pure Al base
+            'Cu': 220,   # Pure Cu base
+            'Ti': 450,   # CP Ti grade 2
+            'Ni': 450,   # Pure Ni base
+            'Co': 500,   # Pure Co base
+            'Mg': 130,   # Pure Mg base
+        }
+        base_strength = base_strengths.get(primary, 200)
 
         # Solid solution strengthening
         num_components = len([wf for wf in weight_fractions if wf > 0.01])
-        ss_strengthening = 50 * (num_components - 1)
+        ss_strengthening = 30 * (num_components - 1)
 
-        # Check for known strengthening elements
+        # Element-specific strengthening contributions
         for elem, wf in zip(elements, weight_fractions):
+            pct = wf * 100
             if elem == 'C' and wf > 0:
-                ss_strengthening += wf * 10000  # Carbon is very effective
+                # Carbon: very effective in steels (Hall-Petch + pearlite)
+                ss_strengthening += pct * 800
             elif elem == 'N' and wf > 0:
-                ss_strengthening += wf * 8000
-            elif elem in ['Mo', 'W', 'V', 'Nb'] and wf > 0:
-                ss_strengthening += wf * 500  # Refractory elements
+                ss_strengthening += pct * 700
+            elif elem == 'Mo' and wf > 0:
+                ss_strengthening += pct * 35
+            elif elem == 'W' and wf > 0:
+                ss_strengthening += pct * 30
+            elif elem == 'V' and wf > 0:
+                # V: beta stabilizer in Ti, carbide former in steel
+                if primary == 'Ti':
+                    ss_strengthening += pct * 80  # Alpha-beta strengthening
+                else:
+                    ss_strengthening += pct * 40
+            elif elem == 'Nb' and wf > 0:
+                ss_strengthening += pct * 35
             elif elem == 'Cr' and wf > 0:
-                ss_strengthening += wf * 100
+                ss_strengthening += pct * 15
+            elif elem == 'Ni' and wf > 0:
+                ss_strengthening += pct * 12
+            elif elem == 'Mn' and wf > 0:
+                ss_strengthening += pct * 25
+            elif elem == 'Si' and wf > 0:
+                ss_strengthening += pct * 60
+            elif elem == 'Cu' and wf > 0 and primary != 'Cu':
+                ss_strengthening += pct * 30  # Precipitation strengthening
+            elif elem == 'Al' and wf > 0:
+                if primary == 'Ti':
+                    ss_strengthening += pct * 60  # Alpha stabilizer
+                elif primary == 'Ni':
+                    ss_strengthening += pct * 100  # Gamma prime former
+                else:
+                    ss_strengthening += pct * 20
+            elif elem == 'Zn' and wf > 0 and primary in ['Cu', 'Al']:
+                ss_strengthening += pct * 8  # Brass/Al-Zn strengthening
 
-        tensile_strength = base_strength + ss_strengthening
-        yield_strength = tensile_strength * 0.6  # Typical ratio
+        # Alloy-category-specific strengthening bonuses
+        category_bonus = 0
+
+        # Titanium alpha-beta alloys (Ti-6Al-4V type)
+        if primary == 'Ti' and elem_pct.get('Al', 0) > 3 and elem_pct.get('V', 0) > 2:
+            category_bonus += 350  # Alpha-beta transformation strengthening
+
+        # Nickel superalloys
+        if primary == 'Ni' and elem_pct.get('Cr', 0) > 10:
+            category_bonus += 200  # Gamma/gamma-prime strengthening
+
+        # Stainless steels
+        if primary == 'Fe' and elem_pct.get('Cr', 0) > 10:
+            if elem_pct.get('Ni', 0) > 6:
+                category_bonus += 100  # Austenitic SS
+            elif elem_pct.get('C', 0) > 0.1:
+                category_bonus += 200  # Martensitic SS
+
+        # Aluminum aerospace alloys (2xxx, 7xxx series)
+        if primary == 'Al':
+            if elem_pct.get('Cu', 0) > 2:
+                category_bonus += 250  # 2xxx precipitation hardening
+            elif elem_pct.get('Zn', 0) > 3:
+                category_bonus += 300  # 7xxx precipitation hardening
+
+        tensile_strength = base_strength + ss_strengthening + category_bonus
+
+        # Yield strength ratio varies by alloy type
+        if primary == 'Ti':
+            ys_ratio = 0.9  # Ti alloys have high YS/UTS ratio
+        elif primary == 'Al':
+            ys_ratio = 0.85
+        else:
+            ys_ratio = 0.65  # Steels and Cu alloys
+
+        yield_strength = tensile_strength * ys_ratio
 
         # Elongation decreases with strength (inverse relationship)
-        elongation = max(5, 60 - tensile_strength / 20)
+        # But varies by alloy system
+        if primary == 'Ti':
+            elongation = max(8, 25 - tensile_strength / 100)
+        elif primary == 'Al':
+            elongation = max(3, 30 - tensile_strength / 50)
+        else:
+            elongation = max(5, 50 - tensile_strength / 25)
 
-        # Young's modulus estimate
+        # Young's modulus estimate (rule of mixtures, roughly)
         weighted_E = 0
         E_values = {'Fe': 210, 'Al': 69, 'Cu': 130, 'Ni': 200, 'Ti': 116,
-                    'Cr': 279, 'Mo': 329, 'W': 411, 'Co': 209}
+                    'Cr': 279, 'Mo': 329, 'W': 411, 'Co': 209, 'Mg': 45,
+                    'Zn': 108, 'Sn': 50, 'Ag': 83, 'Au': 78, 'Pb': 16}
         for elem, wf in zip(elements, weight_fractions):
             E = E_values.get(elem, 150)
             weighted_E += wf * E
 
-        # Hardness estimate (correlated with strength)
-        hardness = tensile_strength / 3 + 50
+        # Hardness estimate (Brinell, correlated with UTS)
+        # HB ≈ UTS/3.45 for steels, varies for other alloys
+        if primary == 'Fe':
+            hardness = tensile_strength / 3.45
+        elif primary == 'Al':
+            hardness = tensile_strength / 4.0
+        elif primary == 'Ti':
+            hardness = tensile_strength / 3.0
+        else:
+            hardness = tensile_strength / 3.5
 
         return {
             'tensile_strength': tensile_strength,

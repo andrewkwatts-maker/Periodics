@@ -78,8 +78,15 @@ class MoleculeDataLoader:
         Returns:
             Dictionary containing molecule data or None if invalid
         """
-        with open(filepath, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        except json.JSONDecodeError as e:
+            print(f"Warning: JSON parse error in {filepath.name}: {e}")
+            return None
+        except Exception as e:
+            print(f"Warning: Failed to read {filepath.name}: {e}")
+            return None
 
         # Validate required fields
         required_fields = ['Name', 'Formula', 'MolecularMass_amu', 'BondType', 'Geometry']

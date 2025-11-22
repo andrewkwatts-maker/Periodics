@@ -41,13 +41,15 @@ class SubatomicDataLoader:
             List of particle dictionaries sorted by mass.
         """
         if not self.subatomic_dir.exists():
-            raise FileNotFoundError(f"SubAtomic directory not found: {self.subatomic_dir}")
+            print(f"Warning: SubAtomic directory not found: {self.subatomic_dir}")
+            return []
 
         # Find all JSON files
         json_files = sorted(self.subatomic_dir.glob("*.json"))
 
         if not json_files:
-            raise ValueError(f"No particle JSON files found in {self.subatomic_dir}")
+            print(f"Warning: No particle JSON files found in {self.subatomic_dir}")
+            return []
 
         loaded_particles = []
 
@@ -83,33 +85,40 @@ class SubatomicDataLoader:
         Returns:
             Dictionary containing particle data or None if invalid
         """
-        with open(filepath, 'r', encoding='utf-8') as f:
-            # Handle JSON with comments (remove them)
-            content = f.read()
-            # Simple comment removal (line comments)
-            lines = content.split('\n')
-            cleaned_lines = []
-            for line in lines:
-                # Remove // comments
-                comment_idx = line.find('//')
-                if comment_idx != -1:
-                    line = line[:comment_idx]
-                cleaned_lines.append(line)
-            content = '\n'.join(cleaned_lines)
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                # Handle JSON with comments (remove them)
+                content = f.read()
+                # Simple comment removal (line comments)
+                lines = content.split('\n')
+                cleaned_lines = []
+                for line in lines:
+                    # Remove // comments
+                    comment_idx = line.find('//')
+                    if comment_idx != -1:
+                        line = line[:comment_idx]
+                    cleaned_lines.append(line)
+                content = '\n'.join(cleaned_lines)
 
-            data = json.loads(content)
+                data = json.loads(content)
 
-        # Validate required fields
-        required_fields = ['Name', 'Type']
-        for field in required_fields:
-            if field not in data:
-                print(f"Warning: Missing required field '{field}' in {filepath.name}")
-                return None
+            # Validate required fields
+            required_fields = ['Name', 'Type']
+            for field in required_fields:
+                if field not in data:
+                    print(f"Warning: Missing required field '{field}' in {filepath.name}")
+                    return None
 
-        # Add computed fields
-        data = self._add_computed_fields(data)
+            # Add computed fields
+            data = self._add_computed_fields(data)
 
-        return data
+            return data
+        except json.JSONDecodeError as e:
+            print(f"Warning: JSON parse error in {filepath.name}: {e}")
+            return None
+        except Exception as e:
+            print(f"Warning: Failed to load {filepath.name}: {e}")
+            return None
 
     def _add_computed_fields(self, data: Dict) -> Dict:
         """Add computed fields for visualization"""
