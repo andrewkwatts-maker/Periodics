@@ -15,6 +15,13 @@ from ui.quark_info_panel import QuarkInfoPanel
 from ui.subatomic_control_panel import SubatomicControlPanel
 from ui.subatomic_info_panel import SubatomicInfoPanel
 
+# Data management dialogs
+from ui.data_editor_dialog import DataEditorDialog, DataListDialog
+from ui.creation_dialog import (
+    AtomCreationDialog, SubatomicCreationDialog, MoleculeCreationDialog,
+    open_atom_creation_dialog, open_subatomic_creation_dialog, open_molecule_creation_dialog
+)
+
 __all__ = [
     'ColorGradientBar',
     'BorderThicknessLegend',
@@ -29,5 +36,14 @@ __all__ = [
     'QuarkInfoPanel',
     # Subatomic exports
     'SubatomicControlPanel',
-    'SubatomicInfoPanel'
+    'SubatomicInfoPanel',
+    # Data management exports
+    'DataEditorDialog',
+    'DataListDialog',
+    'AtomCreationDialog',
+    'SubatomicCreationDialog',
+    'MoleculeCreationDialog',
+    'open_atom_creation_dialog',
+    'open_subatomic_creation_dialog',
+    'open_molecule_creation_dialog',
 ]
