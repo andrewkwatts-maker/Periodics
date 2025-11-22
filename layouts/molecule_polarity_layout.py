@@ -6,6 +6,8 @@ Arranges molecules grouped by polarity (Polar, Nonpolar, Ionic).
 from typing import List, Dict
 from core.molecule_enums import MoleculePolarity
 
+from data.layout_config_loader import get_molecule_config, get_layout_config
+
 
 class MoleculePolarityLayout:
     """Polarity-grouped layout for molecules"""
@@ -13,12 +15,22 @@ class MoleculePolarityLayout:
     def __init__(self, widget_width: int, widget_height: int):
         self.widget_width = widget_width
         self.widget_height = widget_height
-        self.card_width = 150
-        self.card_height = 170
-        self.padding = 30
-        self.spacing = 15
-        self.group_spacing = 40
-        self.header_height = 40
+
+        # Load configuration from JSON
+        config = get_layout_config()
+        card_size = config.get_card_size('molecules')
+        spacing = config.get_spacing('molecules')
+        margins = config.get_margins('molecules')
+
+        self.card_width = card_size.get('width', 150)
+        self.card_height = card_size.get('height', 170)
+        self.padding = margins.get('top', 80)
+        self.spacing = spacing.get('card', 15)
+        self.group_spacing = spacing.get('group', 40)
+        self.header_height = spacing.get('header', 40)
+
+        # Load polarity ordering from config
+        self.polarity_order = config.get_ordering('molecules', 'polarity')
 
     def calculate_layout(self, molecules: List[Dict]) -> List[Dict]:
         """
@@ -50,8 +62,10 @@ class MoleculePolarityLayout:
         positioned_molecules = []
         current_y = self.padding
 
-        # Order of groups
-        group_order = ['Polar', 'Nonpolar', 'Ionic']
+        # Build group order from config, adding Ionic if present
+        group_order = list(self.polarity_order) if self.polarity_order else ['Polar', 'Nonpolar']
+        if 'Ionic' not in group_order:
+            group_order.append('Ionic')
 
         for group_name in group_order:
             group_mols = groups.get(group_name, [])

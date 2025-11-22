@@ -4,10 +4,11 @@ QuarkUnifiedTable - Main visualization widget for particles
 Handles all layout modes and user interactions for the Quarks tab.
 """
 
+import json
 import math
 from PySide6.QtWidgets import QWidget
 from PySide6.QtCore import Qt, QPointF, Signal
-from PySide6.QtGui import (QPainter, QColor, QPen, QBrush, QFont)
+from PySide6.QtGui import (QPainter, QColor, QPen, QBrush, QFont, QGuiApplication)
 
 from core.quark_enums import QuarkLayoutMode, QuarkProperty, ParticleType
 from data.quark_loader import QuarkDataLoader
@@ -15,6 +16,10 @@ from layouts.quark_standard_layout import QuarkStandardLayoutRenderer
 from layouts.quark_linear_layout import QuarkLinearLayoutRenderer
 from layouts.quark_circular_layout import QuarkCircularLayoutRenderer
 from layouts.quark_alternative_layout import QuarkAlternativeLayoutRenderer
+from layouts.quark_force_network_layout import QuarkForceNetworkLayoutRenderer
+from layouts.quark_mass_spiral_layout import QuarkMassSpiralLayoutRenderer
+from layouts.quark_fermion_boson_layout import QuarkFermionBosonLayoutRenderer
+from layouts.quark_charge_mass_layout import QuarkChargeMassLayoutRenderer
 
 
 class QuarkUnifiedTable(QWidget):
@@ -88,7 +93,11 @@ class QuarkUnifiedTable(QWidget):
             QuarkLayoutMode.STANDARD_MODEL: QuarkStandardLayoutRenderer(self.width(), self.height()),
             QuarkLayoutMode.LINEAR: QuarkLinearLayoutRenderer(self.width(), self.height()),
             QuarkLayoutMode.CIRCULAR: QuarkCircularLayoutRenderer(self.width(), self.height()),
-            QuarkLayoutMode.ALTERNATIVE: QuarkAlternativeLayoutRenderer(self.width(), self.height())
+            QuarkLayoutMode.ALTERNATIVE: QuarkAlternativeLayoutRenderer(self.width(), self.height()),
+            QuarkLayoutMode.FORCE_NETWORK: QuarkForceNetworkLayoutRenderer(self.width(), self.height()),
+            QuarkLayoutMode.MASS_SPIRAL: QuarkMassSpiralLayoutRenderer(self.width(), self.height()),
+            QuarkLayoutMode.FERMION_BOSON: QuarkFermionBosonLayoutRenderer(self.width(), self.height()),
+            QuarkLayoutMode.CHARGE_MASS: QuarkChargeMassLayoutRenderer(self.width(), self.height())
         }
         self.current_renderer = self.renderers[self.layout_mode]
 
@@ -274,6 +283,9 @@ class QuarkUnifiedTable(QWidget):
             if self.hovered_particle:
                 self.selected_particle = self.hovered_particle
                 self.particle_selected.emit(self.selected_particle)
+                # Copy particle data to clipboard
+                clipboard_text = json.dumps(self.selected_particle, indent=2, default=str)
+                QGuiApplication.clipboard().setText(clipboard_text)
                 self.update()
 
     def mouseReleaseEvent(self, event):

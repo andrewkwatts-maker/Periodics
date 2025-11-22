@@ -13,6 +13,10 @@ class SubatomicLayoutMode(Enum):
     CHARGE_ORDER = "charge_order"       # Ordered by charge
     DECAY_CHAIN = "decay_chain"         # Show decay relationships
     QUARK_CONTENT = "quark_content"     # Group by quark content
+    EIGHTFOLD_WAY = "eightfold_way"     # Strangeness-Isospin plot (I3 vs Y)
+    LIFETIME_SPECTRUM = "lifetime_spectrum"  # Logarithmic lifetime timeline
+    QUARK_TREE = "quark_tree"           # Hierarchical quark composition tree
+    DISCOVERY_TIMELINE = "discovery_timeline"  # Chronological discovery arrangement
 
     @classmethod
     def from_string(cls, value):
@@ -33,7 +37,11 @@ class SubatomicLayoutMode(Enum):
             cls.MASS_ORDER: "Mass Order",
             cls.CHARGE_ORDER: "Charge Order",
             cls.DECAY_CHAIN: "Decay Chains",
-            cls.QUARK_CONTENT: "Quark Content"
+            cls.QUARK_CONTENT: "Quark Content",
+            cls.EIGHTFOLD_WAY: "Eightfold Way",
+            cls.LIFETIME_SPECTRUM: "Lifetime Spectrum",
+            cls.QUARK_TREE: "Quark Tree",
+            cls.DISCOVERY_TIMELINE: "Discovery Timeline"
         }
         return display_names.get(mode, "Unknown")
 

@@ -13,6 +13,10 @@ class MoleculeLayoutMode(Enum):
     POLARITY = "polarity"
     BOND_TYPE = "bond_type"
     GEOMETRY = "geometry"
+    PHASE_DIAGRAM = "phase_diagram"
+    DIPOLE = "dipole"
+    DENSITY = "density"
+    BOND_COMPLEXITY = "bond_complexity"
 
     @classmethod
     def from_string(cls, value):
@@ -33,7 +37,11 @@ class MoleculeLayoutMode(Enum):
             cls.MASS_ORDER: "Mass Order",
             cls.POLARITY: "By Polarity",
             cls.BOND_TYPE: "By Bond Type",
-            cls.GEOMETRY: "By Geometry"
+            cls.GEOMETRY: "By Geometry",
+            cls.PHASE_DIAGRAM: "Phase Diagram",
+            cls.DIPOLE: "Dipole-Polarity",
+            cls.DENSITY: "Density-Mass",
+            cls.BOND_COMPLEXITY: "Bond Complexity"
         }
         return display_names.get(mode, "Unknown")
 

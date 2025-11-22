@@ -12,11 +12,12 @@ UnifiedTable - Main visualization widget
 Handles all layout modes and user interactions
 """
 
+import json
 import math
 from PySide6.QtWidgets import QWidget
 from PySide6.QtCore import Qt, QPointF, QRectF, QTimer
 from PySide6.QtGui import (QPainter, QColor, QPen, QBrush, QFont, QPainterPath,
-                           QLinearGradient, QRadialGradient, QPolygonF)
+                           QLinearGradient, QRadialGradient, QPolygonF, QGuiApplication)
 
 # Import element data loader (JSON-based)
 from data.element_loader import get_loader, ElementDataLoader
@@ -42,6 +43,9 @@ from utils.position_calculator import PositionCalculator
 # Import orbital cloud functions
 from utils.orbital_clouds import (get_orbital_probability, get_available_orbitals,
                                    get_orbital_name, get_real_shell_radii)
+
+# Import SDF renderer for smooth particle visualization
+from utils.sdf_renderer import SDFRenderer
 
 # Import layout renderers
 from layouts import (CircularLayoutRenderer, SpiralLayoutRenderer,
@@ -3795,74 +3799,22 @@ class UnifiedTable(QWidget):
         max_radius_angstroms = shell_radius_angstroms * 2.0
         max_radius_px = shell_radius_px  # Clouds draw out to this radius
 
-        # Draw probability cloud using optimized 3D rendering
-        painter.setPen(Qt.PenStyle.NoPen)
-
-        # Pre-calculate rotation matrices
-        cos_x = math.cos(self.rotation_x)
-        sin_x = math.sin(self.rotation_x)
-        cos_y = math.cos(self.rotation_y)
-        sin_y = math.sin(self.rotation_y)
-
-        # Draw probability cloud as concentric circles with probability-based alpha
-        num_samples = 50  # More samples for smoother cloud
-
-        # Animation offset for fuzzy effect (subtle waviness)
-        animation_offset = math.sin(self.cloud_animation_phase) * 0.05
-
-        for i in range(num_samples - 1, -1, -1):  # Draw from outer to inner
-            # Sample radius in Angstroms - extend to cover full orbital extent
-            t_radius = (i + 1) / num_samples
-            r_angstroms = t_radius * max_radius_angstroms
-
-            # Get approximate probability (average over angles)
-            prob_sum = 0.0
-            num_angle_samples = 4
-            for angle_idx in range(num_angle_samples):
-                theta = (angle_idx / num_angle_samples) * math.pi
-                prob_sum += get_orbital_probability(n, l, m, r_angstroms, theta, 0, Z=z)
-            probability = prob_sum / num_angle_samples
-            probability = min(1.0, probability * 5.0)
-
-            # Apply animation to probability (fuzzy pulsing effect)
-            probability_animated = probability * (1.0 + animation_offset * math.sin(t_radius * math.pi * 2 + self.cloud_animation_phase))
-            probability_animated = max(0.0, min(1.0, probability_animated))
-
-            if probability_animated < 0.01:
-                continue
-
-            # Convert radius to pixels - extend proportionally to shell radius
-            radius_px = shell_radius_px * (r_angstroms / shell_radius_angstroms)
-
-            # Apply 3D rotation - create elliptical projection
-            # Perspective scale factors based on rotation
-            scale_x = abs(cos_y)  # Foreshortening in X when rotated around Y
-            scale_y = abs(cos_x)  # Foreshortening in Y when rotated around X
-
-            # Don't let it collapse completely
-            scale_x = max(0.3, scale_x)
-            scale_y = max(0.3, scale_y)
-
-            # Draw ellipse with rotation-based scaling
-            ellipse_width = radius_px * scale_x
-            ellipse_height = radius_px * scale_y
-
-            # Create radial gradient for smooth cloud appearance
-            gradient = QRadialGradient(center_x, center_y, max(ellipse_width, ellipse_height))
-
-            # Use light transparent blue for electron cloud
-            cloud_color = QColor(100, 180, 255)  # Light blue
-            cloud_color.setAlpha(int(60 * probability_animated * self.cloud_opacity))
-            gradient.setColorAt(0, cloud_color)
-
-            cloud_color.setAlpha(int(30 * probability_animated * self.cloud_opacity))
-            gradient.setColorAt(0.7, cloud_color)
-
-            cloud_color.setAlpha(0)
-            gradient.setColorAt(1.0, cloud_color)
-
-            painter.setBrush(QBrush(gradient))
-            painter.drawEllipse(QPointF(center_x, center_y), ellipse_width, ellipse_height)
+        # Use SDF-based rendering for smooth probability cloud visualization
+        # SDFRenderer provides better falloff, anti-aliasing, and orbital-specific shapes
+        SDFRenderer.draw_orbital_cloud(
+            painter=painter,
+            cx=center_x,
+            cy=center_y,
+            n=n,
+            l=l,
+            m=m,
+            shell_radius=shell_radius_px,
+            rotation_x=self.rotation_x,
+            rotation_y=self.rotation_y,
+            opacity=self.cloud_opacity,
+            Z=z,
+            animation_phase=self.cloud_animation_phase
+        )
 
     def draw_electron_shells(self, painter, center_x, center_y):
         """
@@ -4266,6 +4218,49 @@ class UnifiedTable(QWidget):
         # Total nucleons
         painter.drawText(int(legend_x), int(legend_y + 45), f"Mass Number: A = {total_nucleons}")
 
+    def draw_subatomic_particles_sdf(self, painter, center_x, center_y):
+        """
+        Draw subatomic particles (protons and neutrons) using SDF-based rendering.
+        Provides smoother visualization with proper depth-based blending.
+        Uses liquid drop model for nuclear radius scaling.
+        """
+        if not self.selected_element or not self.show_subatomic_particles:
+            return
+
+        z = self.selected_element.get('z', 1)
+        symbol = self.selected_element.get('symbol', '')
+
+        # Get isotope information for neutron count
+        isotopes = self.selected_element.get('isotopes', [])
+        if isotopes:
+            # Use most abundant isotope (isotopes are now in tuple format: (mass, abundance))
+            most_abundant = max(isotopes, key=lambda iso: iso[1] if isinstance(iso, tuple) else iso.get('abundance', 0))
+            mass = most_abundant[0] if isinstance(most_abundant, tuple) else most_abundant.get('mass_number', z * 2)
+        else:
+            # Estimate mass number
+            mass = z * 2
+
+        neutrons = mass - z
+
+        # Calculate base radius for visualization
+        if hasattr(self, 'outermost_radius'):
+            base_radius = self.outermost_radius / 2  # Use half of outermost electron shell
+        else:
+            base_radius = 60
+
+        # Use SDF renderer for smooth nucleus visualization
+        SDFRenderer.draw_nucleus(
+            painter=painter,
+            cx=center_x,
+            cy=center_y,
+            protons=z,
+            neutrons=neutrons,
+            base_radius=base_radius,
+            rotation_x=self.rotation_x,
+            rotation_y=self.rotation_y,
+            show_legend=True
+        )
+
     def wheelEvent(self, event):
         """Handle mouse wheel for zooming in all layout modes"""
         # Get mouse position before zoom
@@ -4472,6 +4467,10 @@ class UnifiedTable(QWidget):
             # If no electron clicked, check for element click
             if not clicked_electron and self.hovered_element:
                 self.selected_element = self.hovered_element
+
+                # Copy element data to clipboard
+                clipboard_text = json.dumps(self.selected_element, indent=2, default=str)
+                QGuiApplication.clipboard().setText(clipboard_text)
 
                 # Update orbital selector when element changes
                 if hasattr(self, 'control_panel') and self.control_panel:

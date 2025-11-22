@@ -20,6 +20,7 @@ class DataCategory(Enum):
     ANTIQUARKS = "antiquarks"
     SUBATOMIC = "subatomic"
     MOLECULES = "molecules"
+    ALLOYS = "alloys"
 
 
 class DataManager:

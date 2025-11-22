@@ -3,11 +3,12 @@ SubatomicUnifiedTable - Main visualization widget for subatomic particles
 Handles all layout modes and user interactions for the Subatomic tab
 """
 
+import json
 import math
 from PySide6.QtWidgets import QWidget
 from PySide6.QtCore import Qt, QPointF, QRectF, Signal
 from PySide6.QtGui import (QPainter, QColor, QPen, QBrush, QFont, QPainterPath,
-                           QLinearGradient, QRadialGradient, QPolygonF)
+                           QLinearGradient, QRadialGradient, QPolygonF, QGuiApplication)
 
 from data.subatomic_loader import get_subatomic_loader, SubatomicDataLoader
 from core.subatomic_enums import (SubatomicLayoutMode, ParticleCategory, SubatomicProperty,
@@ -114,6 +115,14 @@ class SubatomicUnifiedTable(QWidget):
             self._calculate_decay_layout(particles)
         elif self.layout_mode == SubatomicLayoutMode.QUARK_CONTENT:
             self._calculate_quark_content_layout(particles)
+        elif self.layout_mode == SubatomicLayoutMode.EIGHTFOLD_WAY:
+            self._calculate_eightfold_layout(particles)
+        elif self.layout_mode == SubatomicLayoutMode.LIFETIME_SPECTRUM:
+            self._calculate_lifetime_layout(particles)
+        elif self.layout_mode == SubatomicLayoutMode.QUARK_TREE:
+            self._calculate_quark_tree_layout(particles)
+        elif self.layout_mode == SubatomicLayoutMode.DISCOVERY_TIMELINE:
+            self._calculate_discovery_layout(particles)
 
         self._needs_layout_update = False
 
@@ -282,6 +291,287 @@ class SubatomicUnifiedTable(QWidget):
 
             rows = (len(particles_list) + cols - 1) // cols
             y_offset += rows * (self.card_height + self.card_spacing) + 60
+
+    def _calculate_eightfold_layout(self, particles):
+        """Layout in Eightfold Way diagram (I3 vs Hypercharge Y)"""
+        y_offset = 80
+        x_start = 50
+
+        self._layout_cache['header'] = {'x': x_start, 'y': y_offset - 40, 'text': 'Eightfold Way (I3 vs Hypercharge)'}
+
+        if not particles:
+            return
+
+        # Calculate I3 and Y for positioning
+        plot_left = 100
+        plot_right = self.width() - 100
+        plot_top = y_offset + 20
+        plot_bottom = plot_top + 500
+        plot_width = plot_right - plot_left
+        plot_height = plot_bottom - plot_top
+
+        # Get ranges
+        i3_values = [p.get('Isospin_I3', 0) for p in particles]
+        y_values = [p.get('Strangeness', 0) + p.get('BaryonNumber_B', 0) for p in particles]
+
+        i3_min, i3_max = min(i3_values) - 0.5, max(i3_values) + 0.5
+        y_min, y_max = min(y_values) - 0.5, max(y_values) + 0.5
+        i3_range = i3_max - i3_min if i3_max != i3_min else 3
+        y_range = y_max - y_min if y_max != y_min else 4
+
+        position_map = {}
+        for p in particles:
+            i3 = p.get('Isospin_I3', 0)
+            hypercharge = p.get('Strangeness', 0) + p.get('BaryonNumber_B', 0)
+
+            # Map to pixel coordinates
+            x_norm = (i3 - i3_min) / i3_range
+            y_norm = (hypercharge - y_min) / y_range
+
+            px = plot_left + x_norm * plot_width - self.card_width / 2
+            py = plot_bottom - y_norm * plot_height - self.card_height / 2
+
+            # Handle overlap
+            key = (round(i3 * 2), round(hypercharge * 2))
+            if key in position_map:
+                px += position_map[key] * 25
+                position_map[key] += 1
+            else:
+                position_map[key] = 1
+
+            self._layout_cache[p['Name']] = {'x': px, 'y': py, 'particle': p}
+
+    def _calculate_lifetime_layout(self, particles):
+        """Layout on logarithmic lifetime spectrum"""
+        y_offset = 80
+        x_start = 50
+
+        self._layout_cache['header'] = {'x': x_start, 'y': y_offset - 40, 'text': 'Lifetime Spectrum (Log Scale)'}
+
+        # Separate by stability
+        stable = [p for p in particles if p.get('Stability') == 'Stable']
+        unstable_baryons = [p for p in particles if p.get('_is_baryon') and p.get('Stability') != 'Stable']
+        unstable_mesons = [p for p in particles if p.get('_is_meson') and p.get('Stability') != 'Stable']
+
+        timeline_left = 100
+        timeline_right = self.width() - 200
+        timeline_width = timeline_right - timeline_left
+        log_min, log_max = -24, 4
+
+        def half_life_to_x(hl):
+            if not hl or hl <= 0:
+                return timeline_left
+            log_hl = max(log_min, min(log_max, math.log10(hl)))
+            return timeline_left + ((log_hl - log_min) / (log_max - log_min)) * timeline_width
+
+        # Stable particles on far right
+        if stable:
+            self._layout_cache['stable_header'] = {'x': x_start, 'y': y_offset, 'text': 'Stable'}
+            for i, p in enumerate(stable):
+                self._layout_cache[p['Name']] = {
+                    'x': timeline_right + 50,
+                    'y': y_offset + 40 + i * (self.card_height + 10),
+                    'particle': p
+                }
+            y_offset += 40 + len(stable) * (self.card_height + 10) + 60
+
+        # Unstable baryons
+        if unstable_baryons:
+            self._layout_cache['baryon_lifetime_header'] = {'x': x_start, 'y': y_offset, 'text': 'Baryons (by half-life)'}
+            y_offset += 40
+            x_positions = {}
+            for p in sorted(unstable_baryons, key=lambda p: p.get('HalfLife_s') or 0):
+                x = half_life_to_x(p.get('HalfLife_s')) - self.card_width / 2
+                x_key = round(x / 50) * 50
+                if x_key in x_positions:
+                    y = y_offset + x_positions[x_key] * (self.card_height + 10)
+                    x_positions[x_key] += 1
+                else:
+                    y = y_offset
+                    x_positions[x_key] = 1
+                self._layout_cache[p['Name']] = {'x': x, 'y': y, 'particle': p}
+            max_rows = max(x_positions.values()) if x_positions else 1
+            y_offset += max_rows * (self.card_height + 10) + 60
+
+        # Unstable mesons
+        if unstable_mesons:
+            self._layout_cache['meson_lifetime_header'] = {'x': x_start, 'y': y_offset, 'text': 'Mesons (by half-life)'}
+            y_offset += 40
+            x_positions = {}
+            for p in sorted(unstable_mesons, key=lambda p: p.get('HalfLife_s') or 0):
+                x = half_life_to_x(p.get('HalfLife_s')) - self.card_width / 2
+                x_key = round(x / 50) * 50
+                if x_key in x_positions:
+                    y = y_offset + x_positions[x_key] * (self.card_height + 10)
+                    x_positions[x_key] += 1
+                else:
+                    y = y_offset
+                    x_positions[x_key] = 1
+                self._layout_cache[p['Name']] = {'x': x, 'y': y, 'particle': p}
+
+    def _calculate_quark_tree_layout(self, particles):
+        """Layout as hierarchical quark composition tree"""
+        y_offset = 80
+        x_start = 50
+
+        self._layout_cache['header'] = {'x': x_start, 'y': y_offset - 40, 'text': 'Quark Composition Tree'}
+
+        # Categorize by quark content
+        light_hadrons = []
+        strange_hadrons = []
+        charm_hadrons = []
+        bottom_hadrons = []
+
+        for p in particles:
+            quark_content = p.get('QuarkContent', '').lower()
+            composition = p.get('Composition', [])
+            has_bottom = 'b' in quark_content or any('bottom' in c.get('Constituent', '').lower() for c in composition)
+            has_charm = 'c' in quark_content or any('charm' in c.get('Constituent', '').lower() for c in composition)
+            has_strange = 's' in quark_content or any('strange' in c.get('Constituent', '').lower() for c in composition)
+
+            if has_bottom:
+                bottom_hadrons.append(p)
+            elif has_charm:
+                charm_hadrons.append(p)
+            elif has_strange:
+                strange_hadrons.append(p)
+            else:
+                light_hadrons.append(p)
+
+        cols = max(1, (self.width() - 100) // (self.card_width + self.card_spacing))
+        level_spacing = 220
+
+        # Level 1: Light hadrons
+        if light_hadrons:
+            self._layout_cache['light_header'] = {'x': x_start, 'y': y_offset, 'text': 'Light Hadrons (u, d)'}
+            y_offset += 40
+            for i, p in enumerate(light_hadrons):
+                row, col = i // cols, i % cols
+                self._layout_cache[p['Name']] = {
+                    'x': x_start + col * (self.card_width + self.card_spacing),
+                    'y': y_offset + row * (self.card_height + self.card_spacing),
+                    'particle': p
+                }
+            rows = (len(light_hadrons) + cols - 1) // cols
+            y_offset += rows * (self.card_height + self.card_spacing) + level_spacing - 160
+
+        # Level 2: Strange hadrons
+        if strange_hadrons:
+            self._layout_cache['strange_header'] = {'x': x_start, 'y': y_offset, 'text': 'Strange Hadrons (+s)'}
+            y_offset += 40
+            for i, p in enumerate(strange_hadrons):
+                row, col = i // cols, i % cols
+                self._layout_cache[p['Name']] = {
+                    'x': x_start + col * (self.card_width + self.card_spacing),
+                    'y': y_offset + row * (self.card_height + self.card_spacing),
+                    'particle': p
+                }
+            rows = (len(strange_hadrons) + cols - 1) // cols
+            y_offset += rows * (self.card_height + self.card_spacing) + level_spacing - 160
+
+        # Level 3: Charm hadrons
+        if charm_hadrons:
+            self._layout_cache['charm_header'] = {'x': x_start, 'y': y_offset, 'text': 'Charm Hadrons (+c)'}
+            y_offset += 40
+            for i, p in enumerate(charm_hadrons):
+                row, col = i // cols, i % cols
+                self._layout_cache[p['Name']] = {
+                    'x': x_start + col * (self.card_width + self.card_spacing),
+                    'y': y_offset + row * (self.card_height + self.card_spacing),
+                    'particle': p
+                }
+            rows = (len(charm_hadrons) + cols - 1) // cols
+            y_offset += rows * (self.card_height + self.card_spacing) + level_spacing - 160
+
+        # Level 4: Bottom hadrons
+        if bottom_hadrons:
+            self._layout_cache['bottom_header'] = {'x': x_start, 'y': y_offset, 'text': 'Bottom Hadrons (+b)'}
+            y_offset += 40
+            for i, p in enumerate(bottom_hadrons):
+                row, col = i // cols, i % cols
+                self._layout_cache[p['Name']] = {
+                    'x': x_start + col * (self.card_width + self.card_spacing),
+                    'y': y_offset + row * (self.card_height + self.card_spacing),
+                    'particle': p
+                }
+
+    def _calculate_discovery_layout(self, particles):
+        """Layout on discovery timeline with mass distribution"""
+        y_offset = 80
+        x_start = 50
+
+        self._layout_cache['header'] = {'x': x_start, 'y': y_offset - 40, 'text': 'Discovery Timeline'}
+
+        # Separate particles with and without discovery dates
+        with_date = []
+        without_date = []
+        for p in particles:
+            discovery = p.get('Discovery', {})
+            year = discovery.get('Year') if isinstance(discovery, dict) else None
+            if year:
+                with_date.append((p, year))
+            else:
+                without_date.append(p)
+
+        with_date.sort(key=lambda x: x[1])
+
+        # Timeline area
+        timeline_left = 100
+        timeline_right = self.width() - 100
+        timeline_width = timeline_right - timeline_left
+
+        year_min = min(p[1] for p in with_date) - 5 if with_date else 1895
+        year_max = max(p[1] for p in with_date) + 5 if with_date else 2020
+        year_range = year_max - year_min
+
+        # Mass range for Y positioning
+        masses = [p.get('Mass_MeVc2', 100) for p, _ in with_date]
+        if masses:
+            mass_values = [m for m in masses if m > 0]
+            log_mass_min = math.log10(min(mass_values)) if mass_values else 0
+            log_mass_max = math.log10(max(mass_values)) if mass_values else 4
+        else:
+            log_mass_min, log_mass_max = 0, 4
+        log_mass_range = log_mass_max - log_mass_min if log_mass_max != log_mass_min else 4
+
+        plot_top = y_offset + 60
+        plot_height = 400
+
+        position_grid = {}
+        for p, year in with_date:
+            mass = p.get('Mass_MeVc2', 100)
+
+            x_norm = (year - year_min) / year_range if year_range else 0.5
+            log_mass = math.log10(mass) if mass > 0 else log_mass_min
+            y_norm = (log_mass - log_mass_min) / log_mass_range
+
+            x = timeline_left + x_norm * timeline_width - self.card_width / 2
+            y = plot_top + plot_height - y_norm * (plot_height - 100) - self.card_height / 2
+
+            # Handle overlap
+            grid_key = (round(x / 80), round(y / 100))
+            if grid_key in position_grid:
+                x += (position_grid[grid_key] % 3) * 30
+                y += (position_grid[grid_key] // 3) * 20
+                position_grid[grid_key] += 1
+            else:
+                position_grid[grid_key] = 1
+
+            self._layout_cache[p['Name']] = {'x': x, 'y': y, 'particle': p}
+
+        # Particles without dates
+        if without_date:
+            unknown_y = plot_top + plot_height + 80
+            self._layout_cache['unknown_header'] = {'x': x_start, 'y': unknown_y, 'text': 'Discovery Date Unknown'}
+            unknown_y += 40
+            cols = max(1, (self.width() - 100) // (self.card_width + self.card_spacing))
+            for i, p in enumerate(without_date):
+                row, col = i // cols, i % cols
+                self._layout_cache[p['Name']] = {
+                    'x': x_start + col * (self.card_width + self.card_spacing),
+                    'y': unknown_y + row * (self.card_height + self.card_spacing),
+                    'particle': p
+                }
 
     def paintEvent(self, event):
         """Paint the widget"""
@@ -505,6 +795,9 @@ class SubatomicUnifiedTable(QWidget):
             if particle:
                 self.selected_particle = particle
                 self.particle_selected.emit(particle)
+                # Copy particle data to clipboard
+                clipboard_text = json.dumps(self.selected_particle, indent=2, default=str)
+                QGuiApplication.clipboard().setText(clipboard_text)
                 self.update()
 
     def mouseReleaseEvent(self, event):

@@ -13,6 +13,10 @@ class QuarkLayoutMode(Enum):
     LINEAR = "linear"  # Linear arrangement by property
     CIRCULAR = "circular"  # Circular arrangement with categories
     ALTERNATIVE = "alternative"  # Alternative grouping (by interaction type)
+    FORCE_NETWORK = "force_network"  # Force interaction network
+    MASS_SPIRAL = "mass_spiral"  # Mass hierarchy spiral
+    FERMION_BOSON = "fermion_boson"  # Fermion/Boson split
+    CHARGE_MASS = "charge_mass"  # Charge-Mass grid
 
     @classmethod
     def from_string(cls, value):
@@ -31,7 +35,11 @@ class QuarkLayoutMode(Enum):
             cls.STANDARD_MODEL: "Standard Model",
             cls.LINEAR: "Linear Arrangement",
             cls.CIRCULAR: "Circular Layout",
-            cls.ALTERNATIVE: "Alternative Grouping"
+            cls.ALTERNATIVE: "Alternative Grouping",
+            cls.FORCE_NETWORK: "Force Network",
+            cls.MASS_SPIRAL: "Mass Spiral",
+            cls.FERMION_BOSON: "Fermion/Boson Split",
+            cls.CHARGE_MASS: "Charge-Mass Grid"
         }
         return names.get(mode, "Unknown")
 

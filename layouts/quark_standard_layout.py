@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt, QPointF, QRectF
 
 from layouts.quark_base_layout import QuarkBaseLayoutRenderer
 from core.quark_enums import ParticleType
+from data.layout_config_loader import get_quark_config, get_layout_config
 
 
 class QuarkStandardLayoutRenderer(QuarkBaseLayoutRenderer):
@@ -24,9 +25,19 @@ class QuarkStandardLayoutRenderer(QuarkBaseLayoutRenderer):
 
     def __init__(self, widget_width, widget_height):
         super().__init__(widget_width, widget_height)
-        self.cell_size = 80
-        self.cell_spacing = 10
-        self.section_spacing = 30
+        # Load configuration values
+        config = get_layout_config()
+        card_size = config.get_card_size('quarks')
+        spacing = config.get_spacing('quarks')
+
+        self.cell_size = card_size.get('default', 70)
+        self.cell_spacing = spacing.get('cell', 10)
+        self.section_spacing = spacing.get('section', 30)
+
+        # Standard model grid configuration
+        sm_config = get_quark_config('standard_model', default={})
+        self.sm_rows = sm_config.get('row_count', 4)
+        self.sm_cols = sm_config.get('col_count', 6)
 
     def create_layout(self, particles, **kwargs):
         """
@@ -39,9 +50,17 @@ class QuarkStandardLayoutRenderer(QuarkBaseLayoutRenderer):
         Returns:
             List of particles with layout positions
         """
+        # Get configuration values
+        config = get_layout_config()
+        card_size = config.get_card_size('quarks')
+        margins = config.get_margins('quarks')
+
+        min_size = card_size.get('min', 45)
+        max_size = card_size.get('max', 120)
+
         # Calculate cell size based on widget dimensions
-        available_width = self.widget_width - 100
-        available_height = self.widget_height - 150
+        available_width = self.widget_width - margins.get('left', 50) - margins.get('right', 50)
+        available_height = self.widget_height - margins.get('top', 100) - margins.get('bottom', 50)
 
         # We need space for 5 columns (3 generations + bosons + Higgs) and 4 rows
         cols = 5
@@ -51,11 +70,11 @@ class QuarkStandardLayoutRenderer(QuarkBaseLayoutRenderer):
             (available_width - (cols + 1) * self.cell_spacing) / cols,
             (available_height - (rows + 1) * self.cell_spacing) / rows
         )
-        self.cell_size = max(60, min(120, self.cell_size))
+        self.cell_size = max(min_size, min(max_size, self.cell_size))
 
         # Starting position
         start_x = (self.widget_width - (cols * self.cell_size + (cols - 1) * self.cell_spacing)) / 2 + self.cell_size / 2
-        start_y = 100 + self.cell_size / 2
+        start_y = margins.get('top', 100) + self.cell_size / 2
 
         # Position particles based on their Standard Model position
         for particle in particles:
@@ -75,7 +94,7 @@ class QuarkStandardLayoutRenderer(QuarkBaseLayoutRenderer):
         # Position antiparticles and composites below main layout
         non_sm_particles = [p for p in particles if not p.get('in_layout', False)]
         if non_sm_particles:
-            extra_start_y = start_y + rows * (self.cell_size + self.cell_spacing) + 60
+            extra_start_y = start_y + rows * (self.cell_size + self.cell_spacing) + self.section_spacing * 2
             for i, particle in enumerate(non_sm_particles):
                 col = i % 6
                 row = i // 6
@@ -120,7 +139,9 @@ class QuarkStandardLayoutRenderer(QuarkBaseLayoutRenderer):
         leptons = [p for p in sm_particles if p.get('sm_row', -1) in [2, 3] and p.get('sm_col', -1) < 3]
         bosons = [p for p in sm_particles if p.get('sm_col', -1) >= 3]
 
-        padding = 15
+        # Get spacing from config
+        spacing = get_layout_config().get_spacing('quarks')
+        padding = spacing.get('cell', 10) + 5
 
         # Quarks section (red-ish)
         if quarks:
@@ -164,8 +185,10 @@ class QuarkStandardLayoutRenderer(QuarkBaseLayoutRenderer):
         font = QFont('Arial', 10)
         painter.setFont(font)
 
-        # Generation labels (top)
-        label_y = 70
+        # Get margins from config
+        margins = get_layout_config().get_margins('quarks')
+        label_y = margins.get('top', 100) - 30
+
         if first_gen:
             x = first_gen[0]['x']
             painter.drawText(QRectF(x - 40, label_y, 80, 20), Qt.AlignmentFlag.AlignCenter, "I")
@@ -182,7 +205,7 @@ class QuarkStandardLayoutRenderer(QuarkBaseLayoutRenderer):
         leptons_row2 = [p for p in sm_particles if p.get('sm_row', -1) == 2 and p.get('sm_col', -1) == 0]
         leptons_row3 = [p for p in sm_particles if p.get('sm_row', -1) == 3 and p.get('sm_col', -1) == 0]
 
-        label_x = 20
+        label_x = margins.get('left', 50) - 30
         font_small = QFont('Arial', 9)
         painter.setFont(font_small)
 

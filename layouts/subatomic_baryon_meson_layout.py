@@ -1,10 +1,11 @@
 """
 Baryon/Meson Layout Renderer for Subatomic Particles
 Displays baryons and mesons in separate visual groups
+
+Uses data-driven configuration from layout_config.json
 """
 
-from PySide6.QtCore import QRectF
-from PySide6.QtGui import QColor
+from data.layout_config_loader import get_subatomic_config, get_layout_config
 
 
 class SubatomicBaryonMesonLayout:
@@ -13,11 +14,37 @@ class SubatomicBaryonMesonLayout:
     def __init__(self, widget_width, widget_height):
         self.widget_width = widget_width
         self.widget_height = widget_height
-        self.card_width = 140
-        self.card_height = 180
-        self.card_spacing = 20
-        self.section_spacing = 60
-        self.header_height = 40
+        self._load_config()
+
+    def _load_config(self):
+        """Load configuration from JSON config file"""
+        config = get_layout_config()
+        card_size = config.get_card_size('subatomic')
+        spacing = config.get_spacing('subatomic')
+        margins = config.get_margins('subatomic')
+
+        self.card_width = card_size.get('width', 140)
+        self.card_height = card_size.get('height', 180)
+        self.card_spacing = spacing.get('card', 20)
+        self.section_spacing = spacing.get('section', 60)
+        self.header_height = spacing.get('header', 40)
+        self.margin_left = margins.get('left', 50)
+        self.margin_right = margins.get('right', 50)
+
+        # Particle type order from config
+        self.particle_type_order = config.get_ordering('subatomic', 'particle_type') or ['Baryon', 'Meson']
+
+        # Colors from config color scheme
+        color_scheme = config.get_color_scheme('subatomic')
+        self.baryon_color = self._hex_to_rgb(color_scheme.get('baryon', '#667EEA'))
+        self.meson_color = self._hex_to_rgb(color_scheme.get('meson', '#F093FB'))
+
+    def _hex_to_rgb(self, hex_color):
+        """Convert hex color to RGB tuple"""
+        if isinstance(hex_color, tuple):
+            return hex_color
+        hex_color = hex_color.lstrip('#')
+        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
     def calculate_layout(self, particles):
         """
@@ -36,10 +63,10 @@ class SubatomicBaryonMesonLayout:
         mesons = [p for p in particles if p.get('_is_meson', False)]
 
         y_offset = self.header_height + 20
-        x_start = 50
+        x_start = self.margin_left
 
         # Calculate columns
-        available_width = self.widget_width - 100
+        available_width = self.widget_width - self.margin_left - self.margin_right
         cols = max(1, available_width // (self.card_width + self.card_spacing))
 
         # Baryon section
@@ -50,7 +77,7 @@ class SubatomicBaryonMesonLayout:
                 'y': y_offset,
                 'text': 'BARYONS',
                 'subtitle': '3 quarks bound by strong force',
-                'color': (102, 126, 234)
+                'color': self.baryon_color
             }
             y_offset += self.header_height
 
@@ -84,7 +111,7 @@ class SubatomicBaryonMesonLayout:
                 'y': y_offset,
                 'text': 'MESONS',
                 'subtitle': 'quark + antiquark pairs',
-                'color': (240, 147, 251)
+                'color': self.meson_color
             }
             y_offset += self.header_height
 
@@ -113,7 +140,7 @@ class SubatomicBaryonMesonLayout:
         baryons = [p for p in particles if p.get('_is_baryon', False)]
         mesons = [p for p in particles if p.get('_is_meson', False)]
 
-        available_width = self.widget_width - 100
+        available_width = self.widget_width - self.margin_left - self.margin_right
         cols = max(1, available_width // (self.card_width + self.card_spacing))
 
         height = self.header_height + 20
@@ -126,7 +153,7 @@ class SubatomicBaryonMesonLayout:
             meson_rows = (len(mesons) + cols - 1) // cols
             height += self.header_height + meson_rows * (self.card_height + self.card_spacing)
 
-        return height + 50  # Add padding
+        return height + self.margin_left  # Add padding
 
     def update_dimensions(self, width, height):
         """Update layout dimensions"""

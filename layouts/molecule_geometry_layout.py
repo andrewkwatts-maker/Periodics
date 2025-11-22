@@ -6,6 +6,8 @@ Arranges molecules grouped by molecular geometry (Linear, Bent, Tetrahedral, etc
 from typing import List, Dict
 from core.molecule_enums import MolecularGeometry
 
+from data.layout_config_loader import get_molecule_config, get_layout_config
+
 
 class MoleculeGeometryLayout:
     """Geometry-grouped layout for molecules"""
@@ -13,12 +15,22 @@ class MoleculeGeometryLayout:
     def __init__(self, widget_width: int, widget_height: int):
         self.widget_width = widget_width
         self.widget_height = widget_height
-        self.card_width = 150
-        self.card_height = 170
-        self.padding = 30
-        self.spacing = 15
-        self.group_spacing = 40
-        self.header_height = 40
+
+        # Load configuration from JSON
+        config = get_layout_config()
+        card_size = config.get_card_size('molecules')
+        spacing = config.get_spacing('molecules')
+        margins = config.get_margins('molecules')
+
+        self.card_width = card_size.get('width', 150)
+        self.card_height = card_size.get('height', 170)
+        self.padding = margins.get('top', 80)
+        self.spacing = spacing.get('card', 15)
+        self.group_spacing = spacing.get('group', 40)
+        self.header_height = spacing.get('header', 40)
+
+        # Load geometry ordering from config
+        self.geometry_order = config.get_ordering('molecules', 'geometry')
 
     def calculate_layout(self, molecules: List[Dict]) -> List[Dict]:
         """
@@ -44,14 +56,9 @@ class MoleculeGeometryLayout:
         positioned_molecules = []
         current_y = self.padding
 
-        # Order of groups (common geometries first)
-        priority_order = [
-            'Linear', 'Bent', 'Trigonal Planar', 'Trigonal Pyramidal',
-            'Tetrahedral', 'Planar Hexagonal', 'Chair Conformation'
-        ]
-
+        # Use configured geometry order
         group_order = []
-        for geom in priority_order:
+        for geom in self.geometry_order:
             if geom in groups:
                 group_order.append(geom)
 

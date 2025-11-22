@@ -6,6 +6,8 @@ Arranges molecules in order of molecular mass, with visual sizing based on mass.
 import math
 from typing import List, Dict
 
+from data.layout_config_loader import get_molecule_config, get_layout_config
+
 
 class MoleculeMassLayout:
     """Mass-ordered layout for molecules"""
@@ -13,10 +15,19 @@ class MoleculeMassLayout:
     def __init__(self, widget_width: int, widget_height: int):
         self.widget_width = widget_width
         self.widget_height = widget_height
-        self.base_card_width = 120
-        self.base_card_height = 140
-        self.padding = 30
-        self.spacing = 20
+
+        # Load configuration from JSON
+        config = get_layout_config()
+        spacing = config.get_spacing('molecules')
+        margins = config.get_margins('molecules')
+        mass_scaling = get_molecule_config('mass_scaling', default={})
+
+        self.base_card_width = mass_scaling.get('base_width', 120)
+        self.base_card_height = mass_scaling.get('base_height', 140)
+        self.min_scale = mass_scaling.get('min_scale', 1.0)
+        self.max_scale = mass_scaling.get('max_scale', 1.5)
+        self.padding = margins.get('top', 80)
+        self.spacing = spacing.get('card', 15) + 5  # Slightly more spacing for variable sizes
 
     def calculate_layout(self, molecules: List[Dict]) -> List[Dict]:
         """
@@ -47,9 +58,9 @@ class MoleculeMassLayout:
         row_start_idx = 0
 
         for idx, mol in enumerate(sorted_mols):
-            # Scale card size based on mass (1.0 to 1.5x)
+            # Scale card size based on mass using config values
             mass = mol.get('mass', min_mass)
-            scale = 1.0 + 0.5 * ((mass - min_mass) / mass_range)
+            scale = self.min_scale + (self.max_scale - self.min_scale) * ((mass - min_mass) / mass_range)
 
             card_width = int(self.base_card_width * scale)
             card_height = int(self.base_card_height * scale)
