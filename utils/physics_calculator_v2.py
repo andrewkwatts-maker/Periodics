@@ -212,6 +212,18 @@ class SubatomicCalculatorV2:
         # === Calculate Parity ===
         parity = cls._calculate_parity(quark_data_list, particle_type)
 
+        # === Calculate Flavor Quantum Numbers ===
+        flavor_quantum_numbers = cls._calculate_flavor_quantum_numbers(quark_data_list)
+
+        # === Calculate C-parity and G-parity ===
+        c_parity = cls._calculate_c_parity(quark_data_list, particle_type)
+        g_parity = cls._calculate_g_parity(quark_data_list, particle_type, isospin_result)
+
+        # === Calculate Magnetic Dipole Moment ===
+        magnetic_moment = cls.calculate_magnetic_dipole_moment(
+            quark_data_list, total_charge, total_mass_mev, spin_result['spin']
+        )
+
         # === Determine Stability ===
         stability = cls._determine_stability(quark_data_list, total_charge, total_mass_mev)
 
@@ -272,12 +284,18 @@ class SubatomicCalculatorV2:
             "Mass_kg": mass_kg,
             "Mass_amu": round(mass_amu, 9),
             "Spin_hbar": spin_result['spin'],
-            "MagneticDipoleMoment_J_T": None,  # Would require full QCD calculation
+            "MagneticDipoleMoment_J_T": magnetic_moment,
             "LeptonNumber_L": 0,
             "BaryonNumber_B": total_baryon,
             "Isospin_I": isospin_result['I'],
             "Isospin_I3": isospin_result['I3'],
             "Parity_P": parity,
+            "C_Parity": c_parity,
+            "G_Parity": g_parity,
+            "Strangeness": flavor_quantum_numbers['strangeness'],
+            "Charm": flavor_quantum_numbers['charm'],
+            "Bottomness": flavor_quantum_numbers['bottomness'],
+            "Topness": flavor_quantum_numbers['topness'],
             "Composition": composition,
             "Stability": stability['status'],
             "HalfLife_s": stability.get('half_life'),
@@ -888,6 +906,150 @@ class SubatomicCalculatorV2:
         total_parity = intrinsic_parity * orbital_parity
 
         return int(total_parity)
+
+    @classmethod
+    def _calculate_flavor_quantum_numbers(cls, quark_data_list: List[Dict]) -> Dict:
+        """
+        Calculate flavor quantum numbers (strangeness, charm, bottomness, topness) from quarks.
+
+        Flavor quantum numbers are additive:
+        - Strangeness S: s quark has S=-1, anti-s has S=+1
+        - Charm C: c quark has C=+1, anti-c has C=-1
+        - Bottomness B': b quark has B'=-1, anti-b has B'=+1
+        - Topness T: t quark has T=+1, anti-t has T=-1
+
+        These are conserved in strong and electromagnetic interactions,
+        but can change in weak interactions.
+
+        Args:
+            quark_data_list: List of quark JSON objects with Name/Symbol
+
+        Returns:
+            Dict with strangeness, charm, bottomness, topness values
+        """
+        strangeness = 0
+        charm = 0
+        bottomness = 0
+        topness = 0
+
+        for q in quark_data_list:
+            name = q.get('Name', '').lower()
+            symbol = q.get('Symbol', '').lower()
+            baryon_num = q.get('BaryonNumber_B', 1/3)
+
+            # Determine if antiquark (negative baryon number)
+            is_antiquark = baryon_num < 0
+
+            # Check quark flavor from name or symbol
+            if 'strange' in name or symbol in ['s', 's̅']:
+                strangeness += 1 if is_antiquark else -1
+            elif 'charm' in name or symbol in ['c', 'c̅']:
+                charm += -1 if is_antiquark else 1
+            elif 'bottom' in name or symbol in ['b', 'b̅']:
+                bottomness += 1 if is_antiquark else -1
+            elif 'top' in name or symbol in ['t', 't̅']:
+                topness += -1 if is_antiquark else 1
+
+        return {
+            'strangeness': strangeness,
+            'charm': charm,
+            'bottomness': bottomness,
+            'topness': topness
+        }
+
+    @classmethod
+    def _calculate_c_parity(cls, quark_data_list: List[Dict], particle_type: str) -> Optional[int]:
+        """
+        Calculate C-parity (charge conjugation parity) for neutral mesons.
+
+        C-parity is only defined for particles that are their own antiparticle
+        (self-conjugate), which applies to neutral mesons made of q-qbar pairs
+        where q = qbar flavor (e.g., uu̅, dd̅, ss̅, cc̅, bb̅).
+
+        For such mesons: C = (-1)^(L+S)
+        - L = orbital angular momentum (0 for ground state)
+        - S = total spin (0 for pseudoscalar, 1 for vector)
+
+        Args:
+            quark_data_list: List of quark JSON objects
+            particle_type: "Baryon" or "Meson"
+
+        Returns:
+            C-parity (+1 or -1) if defined, None otherwise
+        """
+        # C-parity only defined for mesons
+        if particle_type != "Meson" or len(quark_data_list) != 2:
+            return None
+
+        # Check if self-conjugate (quark and antiquark are same flavor)
+        q1 = quark_data_list[0]
+        q2 = quark_data_list[1]
+
+        # Get base flavor (strip antiquark markers)
+        sym1 = q1.get('Symbol', '').lower().replace('̅', '').replace('\u0305', '')
+        sym2 = q2.get('Symbol', '').lower().replace('̅', '').replace('\u0305', '')
+
+        # Check if same flavor (one should be antiquark)
+        b1 = q1.get('BaryonNumber_B', 1/3)
+        b2 = q2.get('BaryonNumber_B', 1/3)
+
+        if sym1 != sym2 or (b1 > 0) == (b2 > 0):
+            # Not self-conjugate, C-parity undefined
+            return None
+
+        # For ground state (L=0), pseudoscalar mesons (S=0): C = (-1)^0 = +1
+        # But accounting for intrinsic fermion properties: C = (-1)^(L+S)
+        # For pi0 (S=0, L=0): C = +1
+        L = 0  # Ground state
+        S = 0  # Pseudoscalar ground state
+        c_parity = int((-1) ** (L + S))
+
+        return c_parity
+
+    @classmethod
+    def _calculate_g_parity(cls, quark_data_list: List[Dict], particle_type: str,
+                            isospin_result: Dict) -> Optional[int]:
+        """
+        Calculate G-parity for non-strange mesons.
+
+        G-parity combines C-parity and isospin rotation:
+        G = C × (-1)^I
+
+        where I is the total isospin.
+
+        G-parity is only defined for non-strange, non-charm, non-bottom mesons
+        (particles containing only u and d quarks).
+
+        Args:
+            quark_data_list: List of quark JSON objects
+            particle_type: "Baryon" or "Meson"
+            isospin_result: Result from _calculate_isospin
+
+        Returns:
+            G-parity (+1 or -1) if defined, None otherwise
+        """
+        if particle_type != "Meson":
+            return None
+
+        # Check that all quarks are u or d type (non-strange, non-heavy)
+        for q in quark_data_list:
+            name = q.get('Name', '').lower()
+            symbol = q.get('Symbol', '').lower().replace('̅', '').replace('\u0305', '')
+            if symbol not in ['u', 'd']:
+                return None  # Contains strange or heavy quarks
+
+        # Get isospin
+        I = isospin_result.get('I', 0)
+
+        # Get C-parity (simplified for light mesons)
+        c_parity = cls._calculate_c_parity(quark_data_list, particle_type)
+        if c_parity is None:
+            c_parity = 1  # Default for mixed u-d states
+
+        # G = C × (-1)^I
+        g_parity = c_parity * int((-1) ** int(I))
+
+        return g_parity
 
     @classmethod
     def _determine_stability(cls, quark_data_list: List[Dict], charge: float, mass_mev: float) -> Dict:
@@ -1814,6 +1976,23 @@ class AtomCalculatorV2:
         # === Calculate Nucleon Positions within Nucleus ===
         nucleon_positions_detailed = cls._calculate_nucleon_positions_detailed(Z, N)
 
+        # === Calculate Nuclear Spin ===
+        nuclear_spin = cls._calculate_nuclear_spin(Z, N, proton_data, neutron_data)
+
+        # === Calculate Nuclear Magnetic Moment ===
+        nuclear_magnetic_moment = cls._calculate_nuclear_magnetic_moment(
+            Z, N, nuclear_spin, proton_data, neutron_data
+        )
+
+        # === Calculate Van der Waals Radius ===
+        vdw_radius = cls._calculate_van_der_waals_radius(atomic_radius, block, period)
+
+        # === Calculate Electron Affinity ===
+        electron_affinity = cls._calculate_electron_affinity(Z, block, period, group, electronegativity)
+
+        # === Calculate Covalent Radius ===
+        covalent_radius = cls._calculate_covalent_radius(atomic_radius, block, period)
+
         # === Preserve ALL Input Nucleon Properties ===
         preserved_nucleons = {
             'proton': {
@@ -1854,11 +2033,16 @@ class AtomCalculatorV2:
             "ionization_energy": round(ionization_energy, 3),
             "electronegativity": round(electronegativity, 2),
             "atomic_radius": atomic_radius,
+            "covalent_radius": covalent_radius,
+            "van_der_waals_radius": vdw_radius,
+            "electron_affinity_kJ_mol": round(electron_affinity, 1),
             "melting_point": round(melting_point, 1),
             "boiling_point": round(boiling_point, 1),
             "density": round(density, 6),
             "nuclear_binding_energy_MeV": round(mass_result['binding_energy_mev'], 3),
             "binding_energy_per_nucleon_MeV": round(mass_result['binding_energy_per_nucleon'], 3),
+            "nuclear_spin": nuclear_spin['spin'],
+            "nuclear_magnetic_moment_nuclear_magneton": round(nuclear_magnetic_moment['moment'], 4) if nuclear_magnetic_moment['moment'] else None,
             "electron_positions": electron_positions,
             "nucleon_positions": nucleon_positions,
 
@@ -2810,6 +2994,264 @@ class AtomCalculatorV2:
         return max(20, min(250, covalent_radius))
 
     @classmethod
+    def _calculate_van_der_waals_radius(cls, atomic_radius: int, block: str, period: int) -> int:
+        """
+        Calculate Van der Waals radius from atomic radius.
+
+        Van der Waals radius represents the effective radius when atoms are
+        not chemically bonded. It is typically larger than covalent radius.
+
+        VdW radius ≈ atomic radius × 1.1-1.5 depending on element type
+
+        Args:
+            atomic_radius: Atomic radius in pm
+            block: Element block (s, p, d, f)
+            period: Period number
+
+        Returns:
+            Van der Waals radius in pm
+        """
+        if atomic_radius == 0:
+            return 0
+
+        # VdW/atomic radius ratios by element type
+        if block == 's':
+            if period <= 2:
+                ratio = 1.4  # H, He, Li, Be have larger VdW radii
+            else:
+                ratio = 1.3  # Alkali/alkaline earth
+        elif block == 'p':
+            ratio = 1.35  # p-block elements
+        elif block == 'd':
+            ratio = 1.25  # Transition metals (more compact)
+        elif block == 'f':
+            ratio = 1.2  # f-block elements
+        else:
+            ratio = 1.3
+
+        vdw_radius = int(atomic_radius * ratio)
+        return max(100, min(350, vdw_radius))
+
+    @classmethod
+    def _calculate_nuclear_spin(cls, Z: int, N: int, proton_data: Dict, neutron_data: Dict) -> Dict:
+        """
+        Calculate nuclear spin from proton and neutron composition.
+
+        Nuclear spin (I) depends on the coupling of nucleon spins:
+        - Even Z, Even N: I = 0 (all spins paired)
+        - Odd Z or Odd N: I = half-integer
+        - Odd Z, Odd N: I = integer (non-zero)
+
+        For single unpaired nucleon: I = j = l ± 1/2
+        Using shell model predictions for common nuclei.
+
+        Args:
+            Z: Proton count
+            N: Neutron count
+            proton_data: Proton JSON object
+            neutron_data: Neutron JSON object
+
+        Returns:
+            Dict with nuclear spin value and method
+        """
+        # Known nuclear spins for common isotopes (ground state)
+        # Format: (Z, N): spin
+        KNOWN_SPINS = {
+            (1, 0): 0.5,    # H-1 (proton)
+            (1, 1): 1,      # H-2 (deuterium)
+            (1, 2): 0.5,    # H-3 (tritium)
+            (2, 1): 0.5,    # He-3
+            (2, 2): 0,      # He-4
+            (3, 3): 1,      # Li-6
+            (3, 4): 1.5,    # Li-7
+            (4, 5): 1.5,    # Be-9
+            (5, 5): 3,      # B-10
+            (5, 6): 1.5,    # B-11
+            (6, 6): 0,      # C-12
+            (6, 7): 0.5,    # C-13
+            (7, 7): 1,      # N-14
+            (7, 8): 0.5,    # N-15
+            (8, 8): 0,      # O-16
+            (8, 9): 2.5,    # O-17
+            (8, 10): 0,     # O-18
+            (9, 10): 0.5,   # F-19
+            (10, 10): 0,    # Ne-20
+            (11, 12): 1.5,  # Na-23
+            (12, 12): 0,    # Mg-24
+            (13, 14): 2.5,  # Al-27
+            (14, 14): 0,    # Si-28
+            (15, 16): 0.5,  # P-31
+            (16, 16): 0,    # S-32
+            (17, 18): 1.5,  # Cl-35
+            (18, 22): 0,    # Ar-40
+            (19, 20): 1.5,  # K-39
+            (20, 20): 0,    # Ca-40
+            (26, 30): 0,    # Fe-56
+            (29, 34): 1.5,  # Cu-63
+            (47, 60): 0.5,  # Ag-107
+            (79, 118): 1.5, # Au-197
+            (82, 126): 0,   # Pb-208
+            (92, 146): 0,   # U-238
+        }
+
+        # Check for known spin
+        if (Z, N) in KNOWN_SPINS:
+            return {
+                'spin': KNOWN_SPINS[(Z, N)],
+                'method': 'experimental_value',
+                'details': f'Known nuclear spin for Z={Z}, N={N}'
+            }
+
+        # Shell model prediction
+        even_Z = (Z % 2 == 0)
+        even_N = (N % 2 == 0)
+
+        if even_Z and even_N:
+            # Even-even nuclei: all spins paired, I = 0
+            spin = 0
+            method = 'shell_model_even_even'
+        elif even_Z or even_N:
+            # Odd-A nuclei: unpaired nucleon determines spin
+            # Use simple shell model approximation
+            unpaired_nucleon_count = Z if not even_Z else N
+            # Get orbital angular momentum from shell filling
+            # Simplified: assume l from shell position
+            if unpaired_nucleon_count <= 2:
+                l = 0  # 1s shell
+            elif unpaired_nucleon_count <= 8:
+                l = 1  # 1p shell
+            elif unpaired_nucleon_count <= 20:
+                l = 2  # 1d or 2s shell
+            elif unpaired_nucleon_count <= 28:
+                l = 3 if unpaired_nucleon_count > 20 else 2  # 1f shell
+            elif unpaired_nucleon_count <= 50:
+                l = 4 if unpaired_nucleon_count > 40 else 3  # 1g/2d shells
+            else:
+                l = 5  # Higher shells
+
+            # j = l ± 1/2, for ground state typically j = l + 1/2 for first half of shell
+            spin = l + 0.5
+            method = 'shell_model_odd_A'
+        else:
+            # Odd-odd nuclei: both proton and neutron unpaired
+            # Spin typically is |jp - jn| to jp + jn, use Nordheim rules
+            # Simplified: often gives low integer spin
+            spin = 1  # Most common for light odd-odd nuclei
+            method = 'shell_model_odd_odd'
+
+        return {
+            'spin': spin,
+            'method': method,
+            'details': f'Z={Z} ({["even","odd"][Z%2]}), N={N} ({["even","odd"][N%2]})'
+        }
+
+    @classmethod
+    def _calculate_nuclear_magnetic_moment(cls, Z: int, N: int, nuclear_spin: Dict,
+                                            proton_data: Dict, neutron_data: Dict) -> Dict:
+        """
+        Calculate nuclear magnetic moment from nucleon composition.
+
+        The nuclear magnetic moment arises from:
+        1. Intrinsic spin magnetic moments of protons and neutrons
+        2. Orbital motion of protons
+
+        μ = g × I × μ_N
+
+        where g is the g-factor and μ_N is the nuclear magneton.
+
+        For protons: g_s ≈ 5.586, g_l = 1
+        For neutrons: g_s ≈ -3.826, g_l = 0
+
+        Args:
+            Z: Proton count
+            N: Neutron count
+            nuclear_spin: Result from _calculate_nuclear_spin
+            proton_data: Proton JSON object
+            neutron_data: Neutron JSON object
+
+        Returns:
+            Dict with magnetic moment in nuclear magnetons
+        """
+        spin = nuclear_spin['spin']
+
+        if spin == 0:
+            return {
+                'moment': 0,
+                'method': 'zero_spin_nucleus',
+                'details': 'Zero spin nuclei have zero magnetic moment'
+            }
+
+        # Known magnetic moments (in nuclear magnetons)
+        KNOWN_MOMENTS = {
+            (1, 0): 2.7928,    # H-1 (proton)
+            (1, 1): 0.8574,    # H-2 (deuterium)
+            (1, 2): 2.9789,    # H-3 (tritium)
+            (2, 1): -2.1276,   # He-3
+            (3, 3): 0.8220,    # Li-6
+            (3, 4): 3.2564,    # Li-7
+            (4, 5): -1.1776,   # Be-9
+            (5, 6): 2.6886,    # B-11
+            (6, 7): 0.7024,    # C-13
+            (7, 7): 0.4038,    # N-14
+            (7, 8): -0.2832,   # N-15
+            (8, 9): -1.8938,   # O-17
+            (9, 10): 2.6289,   # F-19
+            (11, 12): 2.2175,  # Na-23
+            (13, 14): 3.6415,  # Al-27
+            (15, 16): 1.1316,  # P-31
+            (17, 18): 0.8219,  # Cl-35
+            (19, 20): 0.3915,  # K-39
+            (26, 31): 0.0906,  # Fe-57
+            (29, 34): 2.2233,  # Cu-63
+            (47, 60): -0.1136, # Ag-107
+            (79, 118): 0.1457, # Au-197
+        }
+
+        if (Z, N) in KNOWN_MOMENTS:
+            return {
+                'moment': KNOWN_MOMENTS[(Z, N)],
+                'method': 'experimental_value',
+                'details': f'Known magnetic moment for Z={Z}, N={N}'
+            }
+
+        # Schmidt model prediction for odd-A nuclei
+        even_Z = (Z % 2 == 0)
+        even_N = (N % 2 == 0)
+
+        if even_Z and even_N:
+            # Should not reach here (spin=0 handled above)
+            moment = 0
+            method = 'even_even'
+        elif not even_Z and even_N:
+            # Odd proton: use Schmidt limits for proton
+            # μ = j for j = l + 1/2, μ = -j/(j+1) * (j + 2.29) for j = l - 1/2
+            j = spin
+            if j > 0:
+                # Assume j = l + 1/2 (more common for ground state)
+                moment = j * 2.793  # g_s/2 * 2j
+            else:
+                moment = 0
+            method = 'schmidt_odd_proton'
+        elif even_Z and not even_N:
+            # Odd neutron: neutron has no charge but has spin magnetic moment
+            j = spin
+            if j > 0:
+                moment = -1.913 * j / (j + 1)  # Simplified
+            else:
+                moment = 0
+            method = 'schmidt_odd_neutron'
+        else:
+            # Odd-odd: complex coupling, use empirical average
+            moment = 0.5  # Typical for light odd-odd nuclei
+            method = 'empirical_odd_odd'
+
+        return {
+            'moment': round(moment, 4),
+            'method': method,
+            'details': f'Estimated from Schmidt model for Z={Z}, N={N}'
+        }
+
+    @classmethod
     def _calculate_emission_wavelength(cls, Z: int, ionization_energy: float) -> float:
         """
         Calculate primary emission wavelength from ionization energy.
@@ -3408,6 +3850,9 @@ class MoleculeCalculatorV2:
             for atom, count in zip(atom_data_list, counts)
         )
 
+        # === Calculate Polarizability ===
+        polarizability = cls._calculate_polarizability(atom_data_list, counts, molecular_mass, geometry_result)
+
         return {
             "Name": molecule_name,
             "Formula": molecule_formula,
@@ -3418,6 +3863,7 @@ class MoleculeCalculatorV2:
             "BondAngle_deg": geometry_result.get('bond_angle'),
             "Polarity": polarity['polarity'],
             "DipoleMoment_D": polarity.get('dipole_estimate'),
+            "Polarizability_A3": polarizability['polarizability_A3'],
             "Composition": composition,
             "Bonds": bonds,
             "TotalAtoms": sum(counts),
@@ -3696,6 +4142,88 @@ class MoleculeCalculatorV2:
             'polarity': 'Polar' if en_diff > 0.4 else 'Nonpolar',
             'reason': 'Based on electronegativity difference',
             'dipole_estimate': en_diff * 0.5 if en_diff > 0.4 else 0
+        }
+
+    @classmethod
+    def _calculate_polarizability(cls, atom_data_list: List[Dict], counts: List[int],
+                                   molecular_mass: float, geometry_result: Dict) -> Dict:
+        """
+        Calculate molecular polarizability.
+
+        Polarizability (alpha) measures how easily the electron cloud is distorted.
+        Using additive atomic polarizabilities with geometric corrections.
+
+        Formula: alpha_mol ≈ Σ(n_i × alpha_i) × geometry_factor
+
+        Atomic polarizabilities (in A^3):
+        H: 0.67, C: 1.76, N: 1.10, O: 0.80, F: 0.56, Cl: 2.18
+        S: 2.90, P: 3.63, Si: 5.38, metals vary widely
+
+        Args:
+            atom_data_list: List of atom data dictionaries
+            counts: List of atom counts
+            molecular_mass: Total molecular mass
+            geometry_result: VSEPR geometry result
+
+        Returns:
+            Dict with polarizability in A^3 and method
+        """
+        # Atomic polarizabilities (A^3) - Tkatchenko-Scheffler reference values
+        ATOMIC_POLARIZABILITIES = {
+            'H': 0.67, 'He': 0.21,
+            'Li': 24.3, 'Be': 5.60, 'B': 3.03, 'C': 1.76, 'N': 1.10, 'O': 0.80,
+            'F': 0.56, 'Ne': 0.39,
+            'Na': 24.1, 'Mg': 10.6, 'Al': 6.80, 'Si': 5.38, 'P': 3.63, 'S': 2.90,
+            'Cl': 2.18, 'Ar': 1.64,
+            'K': 43.4, 'Ca': 22.8, 'Fe': 8.40, 'Cu': 6.10, 'Zn': 5.75,
+            'Br': 3.05, 'Kr': 2.48,
+            'Ag': 7.20, 'I': 5.35, 'Xe': 4.04,
+            'Au': 5.80, 'Hg': 5.70,
+        }
+
+        total_polarizability = 0
+        atom_contributions = []
+
+        for atom, count in zip(atom_data_list, counts):
+            symbol = atom.get('symbol', '?')
+            alpha_atom = ATOMIC_POLARIZABILITIES.get(symbol, 2.0)  # Default 2.0 A^3
+
+            contribution = alpha_atom * count
+            total_polarizability += contribution
+
+            atom_contributions.append({
+                'element': symbol,
+                'count': count,
+                'alpha_atomic_A3': alpha_atom,
+                'contribution_A3': contribution
+            })
+
+        # Geometry factor: linear molecules are more polarizable along bond axis
+        # Spherical molecules have isotropic polarizability
+        geometry = geometry_result.get('geometry', 'Unknown')
+        geometry_factors = {
+            'Linear': 1.15,
+            'Bent': 1.05,
+            'Trigonal Planar': 1.00,
+            'Tetrahedral': 1.00,
+            'Trigonal Pyramidal': 1.02,
+            'Octahedral': 1.00,
+            'Square Planar': 1.08,
+        }
+        geometry_factor = geometry_factors.get(geometry, 1.00)
+
+        # Bond correction: multiple bonds reduce polarizability slightly
+        bond_correction = 0.95  # Approximate for typical organic molecules
+
+        final_polarizability = total_polarizability * geometry_factor * bond_correction
+
+        return {
+            'polarizability_A3': round(final_polarizability, 2),
+            'atom_contributions': atom_contributions,
+            'geometry_factor': geometry_factor,
+            'bond_correction': bond_correction,
+            'method': 'additive_atomic_polarizabilities',
+            'units': 'angstrom^3'
         }
 
     @classmethod
