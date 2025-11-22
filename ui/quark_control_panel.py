@@ -7,14 +7,21 @@ Provides UI controls for particle visualization settings.
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox,
                                 QScrollArea, QRadioButton, QComboBox, QCheckBox,
                                 QPushButton, QFrame)
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
 
 from core.quark_enums import QuarkLayoutMode, QuarkProperty
+from data.data_manager import get_data_manager, DataCategory
 
 
 class QuarkControlPanel(QWidget):
     """Control panel for the Quark visualization"""
+
+    # Data management signals
+    add_requested = Signal()
+    edit_requested = Signal()
+    remove_requested = Signal()
+    reset_requested = Signal()
 
     def __init__(self, table_widget):
         super().__init__()
@@ -58,6 +65,9 @@ class QuarkControlPanel(QWidget):
 
         # Display Options
         layout.addWidget(self._create_display_options_group())
+
+        # Data Management
+        layout.addWidget(self._create_data_management_group())
 
         layout.addStretch()
 
@@ -383,3 +393,88 @@ class QuarkControlPanel(QWidget):
                 background: rgba(102, 126, 234, 200);
             }
         """
+
+    def _create_data_management_group(self):
+        """Create data management controls group"""
+        group = QGroupBox("Data Management")
+        group.setStyleSheet(self._get_group_style("#26a69a"))
+        layout = QVBoxLayout()
+
+        # Buttons row
+        btn_layout = QHBoxLayout()
+
+        button_style = """
+            QPushButton {
+                background: rgba(38, 166, 154, 150);
+                color: white;
+                border: none;
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-size: 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background: rgba(38, 166, 154, 200);
+            }
+            QPushButton:disabled {
+                background: rgba(100, 100, 100, 100);
+                color: rgba(255, 255, 255, 100);
+            }
+        """
+
+        self.add_btn = QPushButton("Add")
+        self.add_btn.setStyleSheet(button_style)
+        self.add_btn.clicked.connect(self.add_requested.emit)
+        btn_layout.addWidget(self.add_btn)
+
+        self.edit_btn = QPushButton("Edit")
+        self.edit_btn.setStyleSheet(button_style)
+        self.edit_btn.setEnabled(False)
+        self.edit_btn.clicked.connect(self.edit_requested.emit)
+        btn_layout.addWidget(self.edit_btn)
+
+        self.remove_btn = QPushButton("Remove")
+        self.remove_btn.setStyleSheet(button_style)
+        self.remove_btn.setEnabled(False)
+        self.remove_btn.clicked.connect(self.remove_requested.emit)
+        btn_layout.addWidget(self.remove_btn)
+
+        layout.addLayout(btn_layout)
+
+        # Reset button
+        self.reset_data_btn = QPushButton("Reset to Defaults")
+        self.reset_data_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                           stop:0 #ef5350, stop:1 #e53935);
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 8px 16px;
+                font-weight: bold;
+                margin-top: 5px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                           stop:0 #f44336, stop:1 #d32f2f);
+            }
+        """)
+        self.reset_data_btn.clicked.connect(self.reset_requested.emit)
+        layout.addWidget(self.reset_data_btn)
+
+        # Item count label
+        self.item_count_label = QLabel("Items: 0")
+        self.item_count_label.setStyleSheet("color: rgba(255,255,255,180); font-size: 10px; margin-top: 5px;")
+        layout.addWidget(self.item_count_label)
+
+        group.setLayout(layout)
+        return group
+
+    def set_item_selected(self, selected):
+        """Enable/disable edit and remove buttons based on selection state"""
+        self.edit_btn.setEnabled(selected)
+        self.remove_btn.setEnabled(selected)
+
+    def update_item_count(self, count):
+        """Update the item count label"""
+        self.item_count_label.setText(f"Items: {count}")

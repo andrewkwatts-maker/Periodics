@@ -22,9 +22,9 @@ class ElementDataLoader:
                          If None, uses default 'data/elements' directory.
         """
         if elements_dir is None:
-            # Default to data/elements relative to this file
+            # Default to data/active/elements relative to this file
             base_dir = Path(__file__).parent
-            elements_dir = base_dir / "elements"
+            elements_dir = base_dir / "active" / "elements"
 
         self.elements_dir = Path(elements_dir)
         self.elements: List[Dict] = []

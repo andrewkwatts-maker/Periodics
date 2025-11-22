@@ -20,9 +20,9 @@ class MoleculeDataLoader:
                          If None, uses default 'Molecules' directory.
         """
         if molecules_dir is None:
-            # Default to Molecules relative to project root
-            base_dir = Path(__file__).parent.parent
-            molecules_dir = base_dir / "Molecules"
+            # Default to data/active/molecules relative to this file
+            base_dir = Path(__file__).parent
+            molecules_dir = base_dir / "active" / "molecules"
 
         self.molecules_dir = Path(molecules_dir)
         self.molecules: List[Dict] = []

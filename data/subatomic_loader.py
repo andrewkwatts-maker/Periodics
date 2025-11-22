@@ -22,9 +22,9 @@ class SubatomicDataLoader:
                           If None, uses default 'SubAtomic' directory.
         """
         if subatomic_dir is None:
-            # Default to SubAtomic relative to project root
-            base_dir = Path(__file__).parent.parent
-            subatomic_dir = base_dir / "SubAtomic"
+            # Default to data/active/subatomic relative to this file
+            base_dir = Path(__file__).parent
+            subatomic_dir = base_dir / "active" / "subatomic"
 
         self.subatomic_dir = Path(subatomic_dir)
         self.particles: List[Dict] = []

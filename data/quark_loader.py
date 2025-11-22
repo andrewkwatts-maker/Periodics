@@ -24,17 +24,18 @@ class QuarkDataLoader:
                      If None, uses parent of this file's directory.
         """
         if base_dir is None:
-            base_dir = Path(__file__).parent.parent
+            # Default to data directory (where this file is located)
+            base_dir = Path(__file__).parent
 
         self.base_dir = Path(base_dir)
         self.particles: List[Dict] = []
         self.particles_by_name: Dict[str, Dict] = {}
         self.particles_by_symbol: Dict[str, Dict] = {}
 
-        # Source directories
-        self.quarks_dir = self.base_dir / "Quarks"
-        self.antiquarks_dir = self.base_dir / "AntiQuarks"
-        self.subatomic_dir = self.base_dir / "SubAtomic"
+        # Source directories - use active data directories
+        self.quarks_dir = self.base_dir / "active" / "quarks"
+        self.antiquarks_dir = self.base_dir / "active" / "antiquarks"
+        self.subatomic_dir = self.base_dir / "active" / "subatomic"
 
     def load_all_particles(self, include_antiparticles: bool = True,
                           include_composite: bool = True) -> List[Dict]:
