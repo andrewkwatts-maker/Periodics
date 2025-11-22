@@ -1,7 +1,11 @@
 """
 Charge Order Layout Renderer for Subatomic Particles
 Groups particles by their electric charge
+
+Uses data-driven configuration from layout_config.json
 """
+
+from data.layout_config_loader import get_subatomic_config, get_layout_config
 
 
 class SubatomicChargeLayout:
@@ -10,11 +14,35 @@ class SubatomicChargeLayout:
     def __init__(self, widget_width, widget_height):
         self.widget_width = widget_width
         self.widget_height = widget_height
-        self.card_width = 140
-        self.card_height = 180
-        self.card_spacing = 20
-        self.section_spacing = 60
-        self.header_height = 40
+        self._load_config()
+
+    def _load_config(self):
+        """Load configuration from JSON config file"""
+        config = get_layout_config()
+        card_size = config.get_card_size('subatomic')
+        spacing = config.get_spacing('subatomic')
+        margins = config.get_margins('subatomic')
+
+        self.card_width = card_size.get('width', 140)
+        self.card_height = card_size.get('height', 180)
+        self.card_spacing = spacing.get('card', 20)
+        self.section_spacing = spacing.get('section', 60)
+        self.header_height = spacing.get('header', 40)
+        self.margin_left = margins.get('left', 50)
+        self.margin_right = margins.get('right', 50)
+
+        # Charge ordering from config
+        self.charge_order = config.get_ordering('subatomic', 'charge') or [2, 1, 0, -1, -2]
+
+        # Charge colors from config color scheme
+        color_scheme = config.get_color_scheme('subatomic')
+        self.charge_colors = get_subatomic_config('charge_colors', default={
+            2: (255, 100, 100),    # +2 red
+            1: (255, 183, 77),     # +1 orange
+            0: (200, 200, 200),    # 0 gray
+            -1: (100, 181, 246),   # -1 blue
+            -2: (156, 39, 176),    # -2 purple
+        })
 
     def calculate_layout(self, particles):
         """
@@ -37,27 +65,29 @@ class SubatomicChargeLayout:
             charge_groups[charge].append(p)
 
         y_offset = self.header_height + 20
-        x_start = 50
+        x_start = self.margin_left
 
         # Calculate columns
-        available_width = self.widget_width - 100
+        available_width = self.widget_width - self.margin_left - self.margin_right
         cols = max(1, available_width // (self.card_width + self.card_spacing))
 
-        # Charge colors
-        charge_colors = {
-            2: (255, 100, 100),    # +2 red
-            1: (255, 183, 77),     # +1 orange
-            0: (200, 200, 200),    # 0 gray
-            -1: (100, 181, 246),   # -1 blue
-            -2: (156, 39, 176),    # -2 purple
-        }
+        # Process charges in configured order, or by sorted keys if not found
+        ordered_charges = [c for c in self.charge_order if c in charge_groups]
+        remaining_charges = sorted([c for c in charge_groups.keys() if c not in ordered_charges], reverse=True)
+        all_charges = ordered_charges + remaining_charges
 
-        # Process charges in order (highest to lowest)
-        for charge in sorted(charge_groups.keys(), reverse=True):
+        for charge in all_charges:
             group = charge_groups[charge]
             charge_str = f"+{charge}" if charge > 0 else str(charge)
 
-            color = charge_colors.get(charge, (150, 150, 150))
+            # Get color from config or default
+            if isinstance(self.charge_colors, dict):
+                color = self.charge_colors.get(charge, (150, 150, 150))
+                if isinstance(color, str):
+                    # Convert hex to RGB tuple if needed
+                    color = (150, 150, 150)
+            else:
+                color = (150, 150, 150)
 
             # Section header
             layout_data[f'_charge_{charge}_header'] = {
@@ -105,7 +135,7 @@ class SubatomicChargeLayout:
                 charge_groups[charge] = []
             charge_groups[charge].append(p)
 
-        available_width = self.widget_width - 100
+        available_width = self.widget_width - self.margin_left - self.margin_right
         cols = max(1, available_width // (self.card_width + self.card_spacing))
 
         height = self.header_height + 20
@@ -115,7 +145,7 @@ class SubatomicChargeLayout:
             rows = (len(group) + cols - 1) // cols
             height += rows * (self.card_height + self.card_spacing) + self.section_spacing
 
-        return height + 50
+        return height + self.margin_left
 
     def update_dimensions(self, width, height):
         """Update layout dimensions"""

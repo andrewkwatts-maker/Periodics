@@ -1,11 +1,14 @@
 """
 Alloy Property Layout
 Arranges alloys in a scatter plot based on two properties (e.g., strength vs density).
+
+Uses data-driven configuration from layout_config.json.
 """
 
 import math
 from typing import List, Dict, Tuple
 from core.alloy_enums import AlloyProperty, AlloyCategory
+from data.layout_config_loader import get_alloy_config, get_layout_config
 
 
 class AlloyPropertyLayout:
@@ -14,13 +17,27 @@ class AlloyPropertyLayout:
     def __init__(self, widget_width: int, widget_height: int):
         self.widget_width = widget_width
         self.widget_height = widget_height
-        self.card_size = 60  # Smaller cards for scatter plot
-        self.padding = 80
-        self.axis_padding = 60
+        self._load_config()
 
         # Default properties for axes
         self.x_property = 'density'
         self.y_property = 'tensile_strength'
+
+    def _load_config(self):
+        """Load layout configuration from JSON."""
+        config = get_layout_config()
+        margins = config.get_margins('alloys')
+
+        # Get scatter plot specific config
+        scatter_config = get_alloy_config('scatter_plot', default={})
+
+        self.card_size = scatter_config.get('card_size', 60)  # Smaller cards for scatter plot
+        self.padding = scatter_config.get('plot_padding', 80)
+        self.axis_padding = scatter_config.get('axis_padding', 60)
+
+        # Fall back to global margins if not specified
+        if not scatter_config:
+            self.padding = margins.get('top', 80)
 
     def set_x_property(self, prop: str):
         """Set the property for X axis"""
@@ -42,6 +59,9 @@ class AlloyPropertyLayout:
         """
         if not alloys:
             return []
+
+        # Reload config in case it changed
+        self._load_config()
 
         # Get property ranges
         x_values = [a.get(self.x_property, 0) for a in alloys]

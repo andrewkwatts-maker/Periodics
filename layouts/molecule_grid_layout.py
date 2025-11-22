@@ -4,7 +4,9 @@ Arranges molecules in a simple grid pattern.
 """
 
 import math
-from typing import List, Dict, Tuple
+from typing import List, Dict
+
+from data.layout_config_loader import get_molecule_config, get_layout_config
 
 
 class MoleculeGridLayout:
@@ -13,10 +15,17 @@ class MoleculeGridLayout:
     def __init__(self, widget_width: int, widget_height: int):
         self.widget_width = widget_width
         self.widget_height = widget_height
-        self.card_width = 160
-        self.card_height = 180
-        self.padding = 20
-        self.spacing = 15
+
+        # Load configuration from JSON
+        config = get_layout_config()
+        card_size = config.get_card_size('molecules')
+        spacing = config.get_spacing('molecules')
+        margins = config.get_margins('molecules')
+
+        self.card_width = card_size.get('width', 150)
+        self.card_height = card_size.get('height', 170)
+        self.padding = margins.get('top', 80)
+        self.spacing = spacing.get('card', 15)
 
     def calculate_layout(self, molecules: List[Dict]) -> List[Dict]:
         """

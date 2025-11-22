@@ -9,6 +9,8 @@ import math
 from typing import List, Dict, Set
 from core.molecule_enums import BondType
 
+from data.layout_config_loader import get_molecule_config, get_layout_config
+
 
 class MoleculeBondComplexityLayout:
     """Bond complexity hierarchy tree layout for molecules"""
@@ -16,14 +18,22 @@ class MoleculeBondComplexityLayout:
     def __init__(self, widget_width: int, widget_height: int):
         self.widget_width = widget_width
         self.widget_height = widget_height
-        self.base_card_width = 120
-        self.base_card_height = 140
-        self.min_card_size = 90
-        self.max_card_size = 160
-        self.padding = 40
-        self.spacing = 20
-        self.level_spacing = 80  # Vertical spacing between complexity levels
-        self.header_height = 45
+
+        # Load configuration from JSON
+        config = get_layout_config()
+        card_size = config.get_card_size('molecules')
+        spacing = config.get_spacing('molecules')
+        margins = config.get_margins('molecules')
+        mass_scaling = get_molecule_config('mass_scaling', default={})
+
+        self.base_card_width = mass_scaling.get('base_width', 120)
+        self.base_card_height = mass_scaling.get('base_height', 140)
+        self.min_card_size = card_size.get('min_width', 120) - 30
+        self.max_card_size = card_size.get('max_width', 200) - 40
+        self.padding = margins.get('top', 80) - 40
+        self.spacing = spacing.get('card', 15) + 5
+        self.level_spacing = spacing.get('group', 40) * 2  # Vertical spacing between complexity levels
+        self.header_height = spacing.get('header', 40) + 5
 
     def _count_total_bonds(self, mol: Dict) -> int:
         """Count total number of bonds in a molecule"""

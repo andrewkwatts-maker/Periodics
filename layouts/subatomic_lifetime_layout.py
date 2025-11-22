@@ -2,9 +2,13 @@
 Lifetime Spectrum Layout Renderer for Subatomic Particles
 Displays particles on a horizontal logarithmic timeline based on half-life
 Groups particles vertically by family (baryons/mesons)
+
+Uses data-driven configuration from layout_config.json
 """
 
 import math
+
+from data.layout_config_loader import get_subatomic_config, get_layout_config
 
 
 class SubatomicLifetimeLayout:
@@ -13,16 +17,40 @@ class SubatomicLifetimeLayout:
     def __init__(self, widget_width, widget_height):
         self.widget_width = widget_width
         self.widget_height = widget_height
-        self.card_width = 120
-        self.card_height = 140
-        self.card_spacing = 15
-        self.header_height = 40
-        self.section_spacing = 80
+        self._load_config()
 
-        # Timeline configuration (log10 scale, in seconds)
-        self.log_min = -24  # 10^-24 seconds (shortest lived)
-        self.log_max = 4    # 10^4 seconds (longest lived unstable)
-        self.timeline_margin = 100
+    def _load_config(self):
+        """Load configuration from JSON config file"""
+        config = get_layout_config()
+        card_size = config.get_card_size('subatomic')
+        spacing = config.get_spacing('subatomic')
+        margins = config.get_margins('subatomic')
+
+        # Slightly smaller cards for timeline view
+        self.card_width = int(card_size.get('width', 140) * 0.85)
+        self.card_height = int(card_size.get('height', 180) * 0.78)
+        self.card_spacing = spacing.get('card', 15)
+        self.header_height = spacing.get('header', 40)
+        self.section_spacing = spacing.get('section', 60) + 20
+
+        # Timeline configuration from config
+        timeline_config = get_subatomic_config('timeline', default={})
+        self.log_min = timeline_config.get('log_min', -24)
+        self.log_max = timeline_config.get('log_max', 4)
+        self.timeline_margin = margins.get('left', 50) * 2
+
+        # Colors from config
+        color_scheme = config.get_color_scheme('subatomic')
+        self.stable_color = self._hex_to_rgb(color_scheme.get('stable', '#00B894'))
+        self.baryon_color = self._hex_to_rgb(color_scheme.get('baryon', '#667EEA'))
+        self.meson_color = self._hex_to_rgb(color_scheme.get('meson', '#F093FB'))
+
+    def _hex_to_rgb(self, hex_color):
+        """Convert hex color to RGB tuple"""
+        if isinstance(hex_color, tuple):
+            return hex_color
+        hex_color = hex_color.lstrip('#')
+        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
     def calculate_layout(self, particles):
         """
@@ -94,7 +122,7 @@ class SubatomicLifetimeLayout:
                 'x': x_start,
                 'y': y_offset,
                 'text': 'STABLE PARTICLES',
-                'color': (100, 255, 100)
+                'color': self.stable_color
             }
             y_offset += 35
 
@@ -124,7 +152,7 @@ class SubatomicLifetimeLayout:
                 'x': x_start,
                 'y': y_offset,
                 'text': 'BARYONS (by half-life)',
-                'color': (102, 126, 234)
+                'color': self.baryon_color
             }
             y_offset += 35
 
@@ -169,7 +197,7 @@ class SubatomicLifetimeLayout:
                 'x': x_start,
                 'y': y_offset,
                 'text': 'MESONS (by half-life)',
-                'color': (240, 147, 251)
+                'color': self.meson_color
             }
             y_offset += 35
 
@@ -213,7 +241,7 @@ class SubatomicLifetimeLayout:
         """Get markers for the timeline axis"""
         markers = []
         # Create markers at key orders of magnitude
-        for exp in range(-24, 5, 3):
+        for exp in range(self.log_min, self.log_max + 1, 3):
             if exp == 0:
                 label = "1 s"
             elif exp == -3:

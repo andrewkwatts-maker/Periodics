@@ -11,6 +11,7 @@ from PySide6.QtCore import Qt, QPointF, QRectF
 
 from layouts.quark_base_layout import QuarkBaseLayoutRenderer
 from core.quark_enums import ParticleType
+from data.layout_config_loader import get_quark_config, get_layout_config
 
 
 class QuarkFermionBosonLayoutRenderer(QuarkBaseLayoutRenderer):
@@ -23,7 +24,15 @@ class QuarkFermionBosonLayoutRenderer(QuarkBaseLayoutRenderer):
 
     def __init__(self, widget_width, widget_height):
         super().__init__(widget_width, widget_height)
-        self.cell_size = 55
+        # Load configuration values
+        config = get_layout_config()
+        card_size = config.get_card_size('quarks')
+
+        self.cell_size = card_size.get('default', 70) - 15
+
+        # Store size constraints from config
+        self.min_size = card_size.get('min', 45) - 5
+        self.max_size = card_size.get('max', 120) - 10
 
     def _is_fermion(self, particle):
         """Determine if particle is a fermion based on spin"""
@@ -52,6 +61,11 @@ class QuarkFermionBosonLayoutRenderer(QuarkBaseLayoutRenderer):
         Returns:
             List of particles with layout positions
         """
+        # Get configuration values
+        config = get_layout_config()
+        margins = config.get_margins('quarks')
+        spacing = config.get_spacing('quarks')
+
         # Separate fermions and bosons
         fermions = []
         bosons = []
@@ -69,20 +83,20 @@ class QuarkFermionBosonLayoutRenderer(QuarkBaseLayoutRenderer):
         bosons.sort(key=lambda p: p.get('Mass_MeVc2', 0) or 0, reverse=True)
 
         # Calculate layout dimensions
-        available_width = self.widget_width - 100
-        available_height = self.widget_height - 180
-        hemisphere_width = (available_width - 60) / 2
+        available_width = self.widget_width - margins.get('left', 50) - margins.get('right', 50)
+        available_height = self.widget_height - margins.get('top', 100) - margins.get('bottom', 50) - 80
+        hemisphere_width = (available_width - spacing.get('section', 30) * 2) / 2
 
         # Calculate cell size based on max group size
         max_count = max(len(fermions), len(bosons), 1)
         cols_per_hemisphere = max(2, min(5, int(math.sqrt(max_count) + 0.5)))
 
         self.cell_size = min(
-            55,
+            self.max_size,
             (hemisphere_width - 40) / cols_per_hemisphere,
             (available_height - 60) / (math.ceil(max_count / cols_per_hemisphere) + 1)
         )
-        self.cell_size = max(40, self.cell_size)
+        self.cell_size = max(self.min_size, self.cell_size)
 
         # Position fermions (left hemisphere)
         fermion_center_x = self.widget_width * 0.25
@@ -101,13 +115,16 @@ class QuarkFermionBosonLayoutRenderer(QuarkBaseLayoutRenderer):
         if not particles:
             return
 
+        # Get margins from config
+        margins = get_layout_config().get_margins('quarks')
+
         n = len(particles)
         cols = max(2, min(5, int(math.sqrt(n) + 0.5)))
         rows = math.ceil(n / cols)
 
         # Start position (centered in hemisphere)
         start_x = center_x - (cols * self.cell_size + (cols - 1) * 8) / 2 + self.cell_size / 2
-        start_y = 130 + self.cell_size / 2
+        start_y = margins.get('top', 100) + 30 + self.cell_size / 2
 
         # Color scheme by particle type
         type_colors = {
@@ -165,8 +182,14 @@ class QuarkFermionBosonLayoutRenderer(QuarkBaseLayoutRenderer):
 
     def _draw_hemisphere_backgrounds(self, painter):
         """Draw background regions for each hemisphere"""
+        # Get margins from config
+        margins = get_layout_config().get_margins('quarks')
+        top_margin = margins.get('top', 100) - 20
+        bottom_margin = margins.get('bottom', 50)
+
         # Fermion hemisphere (left) - bluish
-        fermion_rect = QRectF(30, 80, self.widget_width / 2 - 50, self.widget_height - 180)
+        fermion_rect = QRectF(30, top_margin, self.widget_width / 2 - 50,
+                              self.widget_height - top_margin - bottom_margin - 80)
         fermion_gradient = QLinearGradient(fermion_rect.left(), fermion_rect.top(),
                                             fermion_rect.right(), fermion_rect.top())
         fermion_gradient.setColorAt(0, QColor(100, 150, 200, 30))
@@ -179,19 +202,20 @@ class QuarkFermionBosonLayoutRenderer(QuarkBaseLayoutRenderer):
         font = QFont('Arial', 14, QFont.Weight.Bold)
         painter.setFont(font)
         painter.setPen(QPen(QColor(100, 180, 230), 1))
-        painter.drawText(QRectF(30, 85, self.widget_width / 2 - 50, 30),
+        painter.drawText(QRectF(30, top_margin + 5, self.widget_width / 2 - 50, 30),
                         Qt.AlignmentFlag.AlignCenter, "FERMIONS")
 
         # Fermion description
         font_small = QFont('Arial', 10)
         painter.setFont(font_small)
         painter.setPen(QPen(QColor(150, 180, 200), 1))
-        painter.drawText(QRectF(30, 105, self.widget_width / 2 - 50, 20),
+        painter.drawText(QRectF(30, top_margin + 25, self.widget_width / 2 - 50, 20),
                         Qt.AlignmentFlag.AlignCenter, "Half-integer spin (1/2, 3/2, ...)")
 
         # Boson hemisphere (right) - orangish
-        boson_rect = QRectF(self.widget_width / 2 + 20, 80,
-                           self.widget_width / 2 - 50, self.widget_height - 180)
+        boson_rect = QRectF(self.widget_width / 2 + 20, top_margin,
+                           self.widget_width / 2 - 50,
+                           self.widget_height - top_margin - bottom_margin - 80)
         boson_gradient = QLinearGradient(boson_rect.left(), boson_rect.top(),
                                           boson_rect.right(), boson_rect.top())
         boson_gradient.setColorAt(0, QColor(200, 150, 100, 10))
@@ -204,7 +228,7 @@ class QuarkFermionBosonLayoutRenderer(QuarkBaseLayoutRenderer):
         font = QFont('Arial', 14, QFont.Weight.Bold)
         painter.setFont(font)
         painter.setPen(QPen(QColor(230, 180, 100), 1))
-        painter.drawText(QRectF(self.widget_width / 2 + 20, 85,
+        painter.drawText(QRectF(self.widget_width / 2 + 20, top_margin + 5,
                                self.widget_width / 2 - 50, 30),
                         Qt.AlignmentFlag.AlignCenter, "BOSONS")
 
@@ -212,16 +236,21 @@ class QuarkFermionBosonLayoutRenderer(QuarkBaseLayoutRenderer):
         font_small = QFont('Arial', 10)
         painter.setFont(font_small)
         painter.setPen(QPen(QColor(200, 180, 150), 1))
-        painter.drawText(QRectF(self.widget_width / 2 + 20, 105,
+        painter.drawText(QRectF(self.widget_width / 2 + 20, top_margin + 25,
                                self.widget_width / 2 - 50, 20),
                         Qt.AlignmentFlag.AlignCenter, "Integer spin (0, 1, 2, ...)")
 
     def _draw_divider(self, painter):
         """Draw dividing line between hemispheres"""
+        # Get margins from config
+        margins = get_layout_config().get_margins('quarks')
+
         center_x = self.widget_width / 2
+        top_y = margins.get('top', 100) - 10
+        bottom_y = self.widget_height - margins.get('bottom', 50) - 90
+
         painter.setPen(QPen(QColor(80, 80, 100), 2, Qt.PenStyle.DashLine))
-        painter.drawLine(QPointF(center_x, 90),
-                        QPointF(center_x, self.widget_height - 110))
+        painter.drawLine(QPointF(center_x, top_y), QPointF(center_x, bottom_y))
 
         # Spin statistics label at divider
         font = QFont('Arial', 9, QFont.Weight.Bold)
@@ -246,8 +275,11 @@ class QuarkFermionBosonLayoutRenderer(QuarkBaseLayoutRenderer):
 
     def _draw_legend(self, painter):
         """Draw legend explaining particle types"""
-        legend_x = 20
-        legend_y = self.widget_height - 90
+        # Get margins from config
+        margins = get_layout_config().get_margins('quarks')
+
+        legend_x = margins.get('left', 50) - 30
+        legend_y = self.widget_height - margins.get('bottom', 50) - 40
 
         font = QFont('Arial', 10, QFont.Weight.Bold)
         painter.setFont(font)

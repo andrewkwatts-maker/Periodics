@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt, QPointF, QRectF
 
 from layouts.quark_base_layout import QuarkBaseLayoutRenderer
 from core.quark_enums import ParticleType, QuarkProperty, InteractionForce
+from data.layout_config_loader import get_quark_config, get_layout_config
 
 
 class QuarkAlternativeLayoutRenderer(QuarkBaseLayoutRenderer):
@@ -24,8 +25,17 @@ class QuarkAlternativeLayoutRenderer(QuarkBaseLayoutRenderer):
 
     def __init__(self, widget_width, widget_height):
         super().__init__(widget_width, widget_height)
-        self.cell_size = 60
-        self.group_spacing = 40
+        # Load configuration values
+        config = get_layout_config()
+        card_size = config.get_card_size('quarks')
+        spacing = config.get_spacing('quarks')
+
+        self.cell_size = card_size.get('default', 70) - 10
+        self.group_spacing = spacing.get('group', 40)
+
+        # Store size constraints from config
+        self.min_size = card_size.get('min', 45)
+        self.max_size = card_size.get('max', 120)
 
     def create_layout(self, particles, **kwargs):
         """
@@ -38,6 +48,10 @@ class QuarkAlternativeLayoutRenderer(QuarkBaseLayoutRenderer):
         Returns:
             List of particles with layout positions
         """
+        # Get configuration values
+        config = get_layout_config()
+        margins = config.get_margins('quarks')
+
         # Group particles by interaction
         strong_particles = []
         em_particles = []
@@ -71,8 +85,8 @@ class QuarkAlternativeLayoutRenderer(QuarkBaseLayoutRenderer):
 
         # Calculate cell size based on largest group
         max_group_size = max(len(parts) for _, parts, _ in groups)
-        available_width = self.widget_width - 100
-        available_height = self.widget_height - 150
+        available_width = self.widget_width - margins.get('left', 50) - margins.get('right', 50)
+        available_height = self.widget_height - margins.get('top', 100) - margins.get('bottom', 50)
 
         # Arrange groups in a grid (2x2 or 1xN depending on number of groups)
         if len(groups) <= 2:
@@ -88,15 +102,15 @@ class QuarkAlternativeLayoutRenderer(QuarkBaseLayoutRenderer):
         # Calculate cell size to fit particles in each group
         max_per_row = max(3, min(6, int(math.sqrt(max_group_size) + 1)))
         self.cell_size = min(
-            70,
+            self.max_size - 10,
             (group_width - 40) / max_per_row,
             (group_height - 60) / max_per_row
         )
-        self.cell_size = max(45, self.cell_size)
+        self.cell_size = max(self.min_size, self.cell_size)
 
         # Position particles in each group
-        start_x = 50
-        start_y = 100
+        start_x = margins.get('left', 50)
+        start_y = margins.get('top', 100)
 
         for g_idx, (name, parts, color) in enumerate(groups):
             g_col = g_idx % cols
@@ -194,8 +208,11 @@ class QuarkAlternativeLayoutRenderer(QuarkBaseLayoutRenderer):
 
     def _draw_legend(self, painter):
         """Draw interaction force legend"""
-        legend_x = 20
-        legend_y = self.widget_height - 100
+        # Get margins from config
+        margins = get_layout_config().get_margins('quarks')
+
+        legend_x = margins.get('left', 50) - 30
+        legend_y = self.widget_height - margins.get('bottom', 50) - 50
 
         font = QFont('Arial', 10, QFont.Weight.Bold)
         painter.setFont(font)

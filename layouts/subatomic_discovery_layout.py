@@ -3,9 +3,13 @@ Discovery Timeline Layout Renderer for Subatomic Particles
 Displays particles arranged chronologically by discovery year
 X-axis: Discovery year
 Y-axis: Mass (showing progression of accessible energies)
+
+Uses data-driven configuration from layout_config.json
 """
 
 import math
+
+from data.layout_config_loader import get_subatomic_config, get_layout_config
 
 
 class SubatomicDiscoveryLayout:
@@ -14,16 +18,37 @@ class SubatomicDiscoveryLayout:
     def __init__(self, widget_width, widget_height):
         self.widget_width = widget_width
         self.widget_height = widget_height
-        self.card_width = 120
-        self.card_height = 150
-        self.card_spacing = 15
-        self.header_height = 40
-        self.timeline_height = 60
+        self._load_config()
 
-        # Timeline bounds (typical particle physics history)
-        self.year_min = 1895  # Near discovery of electron
-        self.year_max = 2020
-        self.timeline_margin = 100
+    def _load_config(self):
+        """Load configuration from JSON config file"""
+        config = get_layout_config()
+        card_size = config.get_card_size('subatomic')
+        spacing = config.get_spacing('subatomic')
+        margins = config.get_margins('subatomic')
+
+        # Smaller cards for timeline plot
+        self.card_width = int(card_size.get('width', 140) * 0.85)
+        self.card_height = int(card_size.get('height', 180) * 0.83)
+        self.card_spacing = spacing.get('card', 15)
+        self.header_height = spacing.get('header', 40)
+        self.timeline_height = 60
+        self.margin_left = margins.get('left', 50)
+        self.margin_right = margins.get('right', 50)
+
+        # Discovery timeline configuration from config
+        discovery_config = get_subatomic_config('discovery', default={})
+        self.year_min = discovery_config.get('year_min', 1895)
+        self.year_max = discovery_config.get('year_max', 2020)
+        self.timeline_margin = margins.get('left', 50) * 2
+
+        # Era boundaries from config
+        self.era_boundaries = get_subatomic_config('era_boundaries', default={
+            'classical': 1932,
+            'nuclear': 1947,
+            'strange': 1964,
+            'quark_model': 1995
+        })
 
     def calculate_layout(self, particles):
         """
@@ -38,7 +63,7 @@ class SubatomicDiscoveryLayout:
         layout_data = {}
 
         y_start = 30
-        x_start = 50
+        x_start = self.margin_left
 
         # Header
         layout_data['_discovery_header'] = {
@@ -78,8 +103,11 @@ class SubatomicDiscoveryLayout:
             actual_min_year = min(p[1] for p in particles_with_date)
             actual_max_year = max(p[1] for p in particles_with_date)
             # Add some padding
-            self.year_min = max(1890, actual_min_year - 5)
-            self.year_max = min(2025, actual_max_year + 5)
+            year_min = max(1890, actual_min_year - 5)
+            year_max = min(2025, actual_max_year + 5)
+        else:
+            year_min = self.year_min
+            year_max = self.year_max
 
         # Store timeline info for axis rendering
         layout_data['_discovery_timeline'] = {
@@ -87,8 +115,8 @@ class SubatomicDiscoveryLayout:
             'left': timeline_left,
             'right': timeline_right,
             'y': timeline_y,
-            'year_min': self.year_min,
-            'year_max': self.year_max,
+            'year_min': year_min,
+            'year_max': year_max,
             'markers': self._get_era_markers()
         }
 
@@ -98,12 +126,12 @@ class SubatomicDiscoveryLayout:
 
         def year_to_x(year):
             """Convert year to x position"""
-            if year < self.year_min:
-                year = self.year_min
-            if year > self.year_max:
-                year = self.year_max
+            if year < year_min:
+                year = year_min
+            if year > year_max:
+                year = year_max
 
-            normalized = (year - self.year_min) / (self.year_max - self.year_min)
+            normalized = (year - year_min) / (year_max - year_min)
             return timeline_left + normalized * timeline_width
 
         # Get mass range for Y positioning
@@ -170,52 +198,11 @@ class SubatomicDiscoveryLayout:
         # Add era bands for visual reference
         layout_data['_eras'] = {
             'type': 'era_bands',
-            'eras': [
-                {
-                    'name': 'Classical Era',
-                    'start': 1895,
-                    'end': 1932,
-                    'color': (100, 100, 150, 50),
-                    'y_start': plot_top,
-                    'y_end': plot_top + plot_height
-                },
-                {
-                    'name': 'Nuclear Era',
-                    'start': 1932,
-                    'end': 1947,
-                    'color': (100, 150, 100, 50),
-                    'y_start': plot_top,
-                    'y_end': plot_top + plot_height
-                },
-                {
-                    'name': 'Strange Particles',
-                    'start': 1947,
-                    'end': 1964,
-                    'color': (150, 100, 100, 50),
-                    'y_start': plot_top,
-                    'y_end': plot_top + plot_height
-                },
-                {
-                    'name': 'Quark Model Era',
-                    'start': 1964,
-                    'end': 1995,
-                    'color': (150, 150, 100, 50),
-                    'y_start': plot_top,
-                    'y_end': plot_top + plot_height
-                },
-                {
-                    'name': 'Modern Era',
-                    'start': 1995,
-                    'end': 2020,
-                    'color': (100, 150, 150, 50),
-                    'y_start': plot_top,
-                    'y_end': plot_top + plot_height
-                }
-            ],
+            'eras': self._get_era_bands(plot_top, plot_height),
             'timeline_left': timeline_left,
             'timeline_right': timeline_right,
-            'year_min': self.year_min,
-            'year_max': self.year_max
+            'year_min': year_min,
+            'year_max': year_max
         }
 
         # Place particles without discovery dates in a separate section
@@ -231,7 +218,7 @@ class SubatomicDiscoveryLayout:
             }
             unknown_y += 35
 
-            available_width = self.widget_width - 100
+            available_width = self.widget_width - self.margin_left - self.margin_right
             cols = max(1, available_width // (self.card_width + self.card_spacing))
 
             for i, p in enumerate(particles_without_date):
@@ -269,15 +256,71 @@ class SubatomicDiscoveryLayout:
             {'year': 2012, 'label': '2012\nHiggs', 'major': True},
         ]
 
+    def _get_era_bands(self, plot_top, plot_height):
+        """Get era bands for visual reference"""
+        # Use era boundaries from config
+        classical_end = self.era_boundaries.get('classical', 1932)
+        nuclear_end = self.era_boundaries.get('nuclear', 1947)
+        strange_end = self.era_boundaries.get('strange', 1964)
+        quark_model_end = self.era_boundaries.get('quark_model', 1995)
+
+        return [
+            {
+                'name': 'Classical Era',
+                'start': 1895,
+                'end': classical_end,
+                'color': (100, 100, 150, 50),
+                'y_start': plot_top,
+                'y_end': plot_top + plot_height
+            },
+            {
+                'name': 'Nuclear Era',
+                'start': classical_end,
+                'end': nuclear_end,
+                'color': (100, 150, 100, 50),
+                'y_start': plot_top,
+                'y_end': plot_top + plot_height
+            },
+            {
+                'name': 'Strange Particles',
+                'start': nuclear_end,
+                'end': strange_end,
+                'color': (150, 100, 100, 50),
+                'y_start': plot_top,
+                'y_end': plot_top + plot_height
+            },
+            {
+                'name': 'Quark Model Era',
+                'start': strange_end,
+                'end': quark_model_end,
+                'color': (150, 150, 100, 50),
+                'y_start': plot_top,
+                'y_end': plot_top + plot_height
+            },
+            {
+                'name': 'Modern Era',
+                'start': quark_model_end,
+                'end': 2020,
+                'color': (100, 150, 150, 50),
+                'y_start': plot_top,
+                'y_end': plot_top + plot_height
+            }
+        ]
+
     def _get_era(self, year):
         """Determine which era a discovery belongs to"""
-        if year < 1932:
+        classical_end = self.era_boundaries.get('classical', 1932)
+        nuclear_end = self.era_boundaries.get('nuclear', 1947)
+        strange_end = self.era_boundaries.get('strange', 1964)
+        quark_model_end = self.era_boundaries.get('quark_model', 1995)
+
+        if year < classical_end:
             return 'classical'
-        elif year < 1947:
+        elif year < nuclear_end:
             return 'nuclear'
-        elif year < 1964:
+        elif year < strange_end:
             return 'strange'
-        elif year < 1995:
+        elif year < quark_model_end:
             return 'quark_model'
         else:
             return 'modern'
@@ -297,7 +340,7 @@ class SubatomicDiscoveryLayout:
         height = self.header_height + self.timeline_height + 500  # Main plot area
 
         if without_date > 0:
-            available_width = self.widget_width - 100
+            available_width = self.widget_width - self.margin_left - self.margin_right
             cols = max(1, available_width // (self.card_width + self.card_spacing))
             rows = (without_date + cols - 1) // cols
             height += 100 + rows * (self.card_height + self.card_spacing)

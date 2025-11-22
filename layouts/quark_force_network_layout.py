@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt, QPointF, QRectF
 
 from layouts.quark_base_layout import QuarkBaseLayoutRenderer
 from core.quark_enums import ParticleType, InteractionForce
+from data.layout_config_loader import get_quark_config, get_layout_config
 
 
 class QuarkForceNetworkLayoutRenderer(QuarkBaseLayoutRenderer):
@@ -26,8 +27,26 @@ class QuarkForceNetworkLayoutRenderer(QuarkBaseLayoutRenderer):
 
     def __init__(self, widget_width, widget_height):
         super().__init__(widget_width, widget_height)
-        self.cell_size = 55
-        self.cluster_spacing = 60
+        # Load configuration values
+        config = get_layout_config()
+        card_size = config.get_card_size('quarks')
+        spacing = config.get_spacing('quarks')
+
+        self.cell_size = card_size.get('default', 70) - 15
+        self.cluster_spacing = spacing.get('section', 30) * 2
+
+        # Store size constraints from config
+        self.min_size = card_size.get('min', 45) - 5
+        self.max_size = card_size.get('max', 120) - 10
+
+        # Load cluster positions from config
+        force_network_config = get_quark_config('force_network', default={})
+        self.cluster_positions = force_network_config.get('cluster_positions', {
+            'strong': [0.25, 0.3],
+            'electromagnetic': [0.75, 0.3],
+            'weak': [0.5, 0.7],
+            'gravitational': [0.5, 0.5]
+        })
 
     def create_layout(self, particles, **kwargs):
         """
@@ -40,12 +59,32 @@ class QuarkForceNetworkLayoutRenderer(QuarkBaseLayoutRenderer):
         Returns:
             List of particles with layout positions
         """
-        # Define force clusters and their colors
+        # Get configuration values
+        config = get_layout_config()
+        margins = config.get_margins('quarks')
+
+        # Define force clusters and their colors, using config positions
         force_clusters = {
-            'Strong': {'particles': [], 'color': QColor(255, 100, 100), 'position': (0.25, 0.3)},
-            'Electromagnetic': {'particles': [], 'color': QColor(100, 150, 255), 'position': (0.75, 0.3)},
-            'Weak': {'particles': [], 'color': QColor(255, 180, 100), 'position': (0.25, 0.7)},
-            'Gravitational': {'particles': [], 'color': QColor(100, 255, 150), 'position': (0.75, 0.7)}
+            'Strong': {
+                'particles': [],
+                'color': QColor(255, 100, 100),
+                'position': tuple(self.cluster_positions.get('strong', [0.25, 0.3]))
+            },
+            'Electromagnetic': {
+                'particles': [],
+                'color': QColor(100, 150, 255),
+                'position': tuple(self.cluster_positions.get('electromagnetic', [0.75, 0.3]))
+            },
+            'Weak': {
+                'particles': [],
+                'color': QColor(255, 180, 100),
+                'position': tuple(self.cluster_positions.get('weak', [0.5, 0.7]))
+            },
+            'Gravitational': {
+                'particles': [],
+                'color': QColor(100, 255, 150),
+                'position': tuple(self.cluster_positions.get('gravitational', [0.5, 0.5]))
+            }
         }
 
         # Categorize particles by their primary interaction force
@@ -69,8 +108,8 @@ class QuarkForceNetworkLayoutRenderer(QuarkBaseLayoutRenderer):
             p['all_forces'] = forces if forces else ['Gravitational']
 
         # Calculate layout dimensions
-        available_width = self.widget_width - 100
-        available_height = self.widget_height - 150
+        available_width = self.widget_width - margins.get('left', 50) - margins.get('right', 50)
+        available_height = self.widget_height - margins.get('top', 100) - margins.get('bottom', 50)
 
         # Calculate cell size based on max cluster size
         max_cluster = max((len(c['particles']) for c in force_clusters.values()), default=1)
@@ -78,8 +117,8 @@ class QuarkForceNetworkLayoutRenderer(QuarkBaseLayoutRenderer):
 
         # Adjust cell size to fit in cluster
         if max_cluster > 0:
-            self.cell_size = min(55, cluster_radius * 1.5 / math.sqrt(max_cluster))
-            self.cell_size = max(40, self.cell_size)
+            self.cell_size = min(self.max_size, cluster_radius * 1.5 / math.sqrt(max_cluster))
+            self.cell_size = max(self.min_size, self.cell_size)
 
         # Position particles in each cluster
         center_x = self.widget_width / 2
@@ -93,7 +132,7 @@ class QuarkForceNetworkLayoutRenderer(QuarkBaseLayoutRenderer):
             # Cluster center position
             pos_x, pos_y = cluster['position']
             cx = center_x + (pos_x - 0.5) * available_width * 0.8
-            cy = 80 + pos_y * (available_height - 60)
+            cy = margins.get('top', 100) - 20 + pos_y * (available_height - 40)
 
             # Store cluster info for each particle
             for p in cluster_particles:
@@ -239,8 +278,11 @@ class QuarkForceNetworkLayoutRenderer(QuarkBaseLayoutRenderer):
 
     def _draw_legend(self, painter):
         """Draw force color legend"""
-        legend_x = 20
-        legend_y = self.widget_height - 100
+        # Get margins from config
+        margins = get_layout_config().get_margins('quarks')
+
+        legend_x = margins.get('left', 50) - 30
+        legend_y = self.widget_height - margins.get('bottom', 50) - 50
 
         font = QFont('Arial', 10, QFont.Weight.Bold)
         painter.setFont(font)

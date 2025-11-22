@@ -11,6 +11,8 @@ import math
 from typing import List, Dict
 from core.molecule_enums import MoleculeState
 
+from data.layout_config_loader import get_molecule_config, get_layout_config
+
 
 class MoleculePhaseDiagramLayout:
     """Phase diagram scatter plot layout for molecules"""
@@ -18,11 +20,21 @@ class MoleculePhaseDiagramLayout:
     def __init__(self, widget_width: int, widget_height: int):
         self.widget_width = widget_width
         self.widget_height = widget_height
-        self.base_card_size = 80
-        self.min_card_size = 60
-        self.max_card_size = 140
-        self.padding = 80  # Extra padding for axis labels
+
+        # Load configuration from JSON
+        config = get_layout_config()
+        card_size = config.get_card_size('molecules')
+        margins = config.get_margins('molecules')
+
+        # Scatter plot card sizes based on config
+        self.base_card_size = card_size.get('width', 150) // 2  # Smaller for scatter
+        self.min_card_size = card_size.get('min_width', 120) // 2
+        self.max_card_size = card_size.get('max_width', 200) // 2 + 40
+        self.padding = margins.get('top', 80)  # Extra padding for axis labels
         self.axis_margin = 60
+
+        # Load state ordering from config
+        self.state_order = config.get_ordering('molecules', 'state')
 
     def calculate_layout(self, molecules: List[Dict]) -> List[Dict]:
         """
@@ -131,10 +143,11 @@ class MoleculePhaseDiagramLayout:
 
     def get_legend_info(self) -> List[Dict]:
         """Get legend information for state colors"""
+        # Use configured state order if available
+        states = self.state_order if self.state_order else ['Solid', 'Liquid', 'Gas']
         return [
-            {'name': 'Solid', 'color': MoleculeState.get_color('Solid')},
-            {'name': 'Liquid', 'color': MoleculeState.get_color('Liquid')},
-            {'name': 'Gas', 'color': MoleculeState.get_color('Gas')}
+            {'name': state, 'color': MoleculeState.get_color(state)}
+            for state in states
         ]
 
     def get_group_headers(self, molecules: List[Dict]) -> List[Dict]:

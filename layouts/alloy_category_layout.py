@@ -1,10 +1,13 @@
 """
 Alloy Category Layout
 Arranges alloys in a grid grouped by category (steels, bronzes, etc.).
+
+Uses data-driven configuration from layout_config.json.
 """
 
 from typing import List, Dict
 from core.alloy_enums import AlloyCategory
+from data.layout_config_loader import get_alloy_config, get_layout_config
 
 
 class AlloyCategoryLayout:
@@ -13,12 +16,21 @@ class AlloyCategoryLayout:
     def __init__(self, widget_width: int, widget_height: int):
         self.widget_width = widget_width
         self.widget_height = widget_height
-        self.card_width = 160
-        self.card_height = 180
-        self.padding = 30
-        self.spacing = 15
-        self.group_spacing = 40
-        self.header_height = 45
+        self._load_config()
+
+    def _load_config(self):
+        """Load layout configuration from JSON."""
+        config = get_layout_config()
+        card_size = config.get_card_size('alloys')
+        spacing = config.get_spacing('alloys')
+        margins = config.get_margins('alloys')
+
+        self.card_width = card_size.get('width', 160)
+        self.card_height = card_size.get('height', 180)
+        self.padding = margins.get('left', 30)
+        self.spacing = spacing.get('card', 15)
+        self.group_spacing = spacing.get('group', 40)
+        self.header_height = spacing.get('header', 45)
 
     def calculate_layout(self, alloys: List[Dict]) -> List[Dict]:
         """
@@ -33,6 +45,9 @@ class AlloyCategoryLayout:
         if not alloys:
             return []
 
+        # Reload config in case it changed
+        self._load_config()
+
         # Group alloys by category
         groups = {}
         for alloy in alloys:
@@ -44,11 +59,13 @@ class AlloyCategoryLayout:
         positioned_alloys = []
         current_y = self.padding
 
-        # Sort categories by predefined order
-        category_order = [
-            'Steel', 'Aluminum', 'Bronze', 'Brass', 'Copper',
-            'Titanium', 'Nickel', 'Superalloy', 'Precious', 'Solder', 'Other'
-        ]
+        # Get category order from config
+        category_order = get_layout_config().get_ordering('alloys', 'category')
+        if not category_order:
+            category_order = [
+                'Steel', 'Aluminum', 'Bronze', 'Brass', 'Copper',
+                'Titanium', 'Nickel', 'Superalloy', 'Precious', 'Solder', 'Other'
+            ]
 
         # Add any categories not in the predefined order
         for cat in sorted(groups.keys()):

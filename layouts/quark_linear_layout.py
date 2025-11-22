@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt, QPointF, QRectF
 
 from layouts.quark_base_layout import QuarkBaseLayoutRenderer
 from core.quark_enums import ParticleType, QuarkProperty
+from data.layout_config_loader import get_quark_config, get_layout_config
 
 
 class QuarkLinearLayoutRenderer(QuarkBaseLayoutRenderer):
@@ -20,9 +21,18 @@ class QuarkLinearLayoutRenderer(QuarkBaseLayoutRenderer):
 
     def __init__(self, widget_width, widget_height):
         super().__init__(widget_width, widget_height)
-        self.cell_size = 70
-        self.cell_spacing = 15
+        # Load configuration values
+        config = get_layout_config()
+        card_size = config.get_card_size('quarks')
+        spacing = config.get_spacing('quarks')
+
+        self.cell_size = card_size.get('default', 70)
+        self.cell_spacing = spacing.get('cell', 10) + 5  # Slightly more for linear layout
         self.orientation = "horizontal"  # or "vertical"
+
+        # Store size constraints from config
+        self.min_size = card_size.get('min', 45)
+        self.max_size = card_size.get('max', 120)
 
     def create_layout(self, particles, **kwargs):
         """
@@ -40,6 +50,10 @@ class QuarkLinearLayoutRenderer(QuarkBaseLayoutRenderer):
         sort_property = kwargs.get('sort_property', 'mass')
         self.orientation = kwargs.get('orientation', 'horizontal')
 
+        # Get configuration values
+        config = get_layout_config()
+        margins = config.get_margins('quarks')
+
         # Sort particles by property
         sorted_particles = self._sort_particles(particles, sort_property)
 
@@ -50,9 +64,9 @@ class QuarkLinearLayoutRenderer(QuarkBaseLayoutRenderer):
 
         if self.orientation == "horizontal":
             # Calculate cell size to fit all particles
-            available_width = self.widget_width - 100
-            self.cell_size = min(70, (available_width - (n - 1) * self.cell_spacing) / n)
-            self.cell_size = max(50, self.cell_size)
+            available_width = self.widget_width - margins.get('left', 50) - margins.get('right', 50)
+            self.cell_size = min(self.max_size, (available_width - (n - 1) * self.cell_spacing) / n)
+            self.cell_size = max(self.min_size, self.cell_size)
 
             total_width = n * self.cell_size + (n - 1) * self.cell_spacing
             start_x = (self.widget_width - total_width) / 2 + self.cell_size / 2
@@ -65,9 +79,9 @@ class QuarkLinearLayoutRenderer(QuarkBaseLayoutRenderer):
                 particle['sort_index'] = i
         else:
             # Vertical layout
-            available_height = self.widget_height - 100
-            self.cell_size = min(70, (available_height - (n - 1) * self.cell_spacing) / n)
-            self.cell_size = max(40, self.cell_size)
+            available_height = self.widget_height - margins.get('top', 100) - margins.get('bottom', 50)
+            self.cell_size = min(self.max_size, (available_height - (n - 1) * self.cell_spacing) / n)
+            self.cell_size = max(self.min_size - 10, self.cell_size)  # Allow slightly smaller for vertical
 
             total_height = n * self.cell_size + (n - 1) * self.cell_spacing
             start_y = (self.widget_height - total_height) / 2 + self.cell_size / 2
@@ -128,13 +142,17 @@ class QuarkLinearLayoutRenderer(QuarkBaseLayoutRenderer):
         if not sorted_particles:
             return
 
+        # Get spacing from config for consistent padding
+        spacing = get_layout_config().get_spacing('quarks')
+        axis_padding = spacing.get('section', 30)
+
         # Draw axis line
         painter.setPen(QPen(QColor(100, 100, 120), 2))
 
         if self.orientation == "horizontal":
             min_x = min(p['x'] for p in sorted_particles) - self.cell_size / 2 - 20
             max_x = max(p['x'] for p in sorted_particles) + self.cell_size / 2 + 20
-            y = sorted_particles[0]['y'] + self.cell_size / 2 + 30
+            y = sorted_particles[0]['y'] + self.cell_size / 2 + axis_padding
 
             # Draw gradient line
             gradient = QLinearGradient(min_x, y, max_x, y)
@@ -169,7 +187,7 @@ class QuarkLinearLayoutRenderer(QuarkBaseLayoutRenderer):
             # Vertical axis
             min_y = min(p['y'] for p in sorted_particles) - self.cell_size / 2 - 20
             max_y = max(p['y'] for p in sorted_particles) + self.cell_size / 2 + 20
-            x = sorted_particles[0]['x'] - self.cell_size / 2 - 30
+            x = sorted_particles[0]['x'] - self.cell_size / 2 - axis_padding
 
             gradient = QLinearGradient(x, min_y, x, max_y)
             gradient.setColorAt(0, QColor(100, 150, 255))

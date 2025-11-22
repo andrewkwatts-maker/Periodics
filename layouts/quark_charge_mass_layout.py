@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt, QPointF, QRectF
 
 from layouts.quark_base_layout import QuarkBaseLayoutRenderer
 from core.quark_enums import ParticleType
+from data.layout_config_loader import get_quark_config, get_layout_config
 
 
 class QuarkChargeMassLayoutRenderer(QuarkBaseLayoutRenderer):
@@ -22,13 +23,22 @@ class QuarkChargeMassLayoutRenderer(QuarkBaseLayoutRenderer):
 
     def __init__(self, widget_width, widget_height):
         super().__init__(widget_width, widget_height)
-        self.cell_size = 55
+        # Load configuration values
+        config = get_layout_config()
+        card_size = config.get_card_size('quarks')
+        margins = config.get_margins('quarks')
 
-        # Grid bounds
-        self.margin_left = 80
-        self.margin_right = 40
-        self.margin_top = 80
-        self.margin_bottom = 100
+        self.cell_size = card_size.get('default', 70) - 15  # Smaller for scatter plot
+
+        # Store size constraints from config
+        self.min_size = card_size.get('min', 45) - 10
+        self.max_size = card_size.get('max', 120) - 10
+
+        # Grid bounds from config
+        self.margin_left = margins.get('left', 50) + 30  # Extra for axis labels
+        self.margin_right = margins.get('right', 50) - 10
+        self.margin_top = margins.get('top', 100) - 20
+        self.margin_bottom = margins.get('bottom', 50) + 50  # Extra for axis labels
 
         # Charge range (typically -1 to +1, but quarks have fractional charges)
         self.charge_min = -1.2
@@ -71,7 +81,7 @@ class QuarkChargeMassLayoutRenderer(QuarkBaseLayoutRenderer):
         # Calculate cell size based on number of particles
         n = len(particles)
         if n > 0:
-            self.cell_size = min(55, max(35, plot_width / (n ** 0.5) * 0.8))
+            self.cell_size = min(self.max_size, max(self.min_size, plot_width / (n ** 0.5) * 0.8))
 
         # Position each particle
         for particle in particles:
@@ -208,7 +218,7 @@ class QuarkChargeMassLayoutRenderer(QuarkBaseLayoutRenderer):
         painter.translate(25, self.margin_top + self.plot_height / 2)
         painter.rotate(-90)
         painter.drawText(QRectF(-self.plot_height / 2, 0, self.plot_height, 25),
-                        Qt.AlignmentFlag.AlignCenter, "Mass (MeV/c²) - Log Scale")
+                        Qt.AlignmentFlag.AlignCenter, "Mass (MeV/c^2) - Log Scale")
         painter.restore()
 
         # X-axis tick labels

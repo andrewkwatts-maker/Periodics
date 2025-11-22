@@ -2,9 +2,13 @@
 Eightfold Way Layout Renderer for Subatomic Particles
 Displays particles in a Strangeness-Isospin (I3 vs Y) plot
 Classic particle physics multiplet diagram showing octets and decuplets
+
+Uses data-driven configuration from layout_config.json
 """
 
 import math
+
+from data.layout_config_loader import get_subatomic_config, get_layout_config
 
 
 class SubatomicEightfoldLayout:
@@ -13,14 +17,43 @@ class SubatomicEightfoldLayout:
     def __init__(self, widget_width, widget_height):
         self.widget_width = widget_width
         self.widget_height = widget_height
-        self.card_width = 120
-        self.card_height = 150
-        self.card_spacing = 15
-        self.header_height = 40
+        self._load_config()
 
-        # Plot configuration
-        self.plot_margin = 100
+    def _load_config(self):
+        """Load configuration from JSON config file"""
+        config = get_layout_config()
+        card_size = config.get_card_size('subatomic')
+        spacing = config.get_spacing('subatomic')
+        margins = config.get_margins('subatomic')
+
+        # Smaller cards for eightfold plot
+        self.card_width = int(card_size.get('width', 140) * 0.85)
+        self.card_height = int(card_size.get('height', 180) * 0.85)
+        self.card_spacing = spacing.get('card', 15)
+        self.header_height = spacing.get('header', 40)
+
+        # Eightfold-specific config
+        eightfold_config = get_subatomic_config('eightfold', default={})
+        self.plot_margin = eightfold_config.get('plot_margin', 100)
         self.axis_label_offset = 30
+
+        # Isospin and strangeness ranges from config
+        isospin_range = eightfold_config.get('isospin_range', [-1.5, 1.5])
+        strangeness_range = eightfold_config.get('strangeness_range', [-3, 0])
+        self.default_i3_range = isospin_range
+        self.default_y_range = strangeness_range
+
+        # Colors from config
+        color_scheme = config.get_color_scheme('subatomic')
+        self.baryon_color = self._hex_to_rgb(color_scheme.get('baryon', '#667EEA'))
+        self.meson_color = self._hex_to_rgb(color_scheme.get('meson', '#F093FB'))
+
+    def _hex_to_rgb(self, hex_color):
+        """Convert hex color to RGB tuple"""
+        if isinstance(hex_color, tuple):
+            return hex_color
+        hex_color = hex_color.lstrip('#')
+        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
     def calculate_layout(self, particles):
         """
@@ -70,10 +103,10 @@ class SubatomicEightfoldLayout:
         i3_values = [c[1] for c in particle_coords]
         y_values = [c[2] for c in particle_coords]
 
-        i3_min = min(i3_values) if i3_values else -1.5
-        i3_max = max(i3_values) if i3_values else 1.5
-        y_min = min(y_values) if y_values else -2
-        y_max = max(y_values) if y_values else 2
+        i3_min = min(i3_values) if i3_values else self.default_i3_range[0]
+        i3_max = max(i3_values) if i3_values else self.default_i3_range[1]
+        y_min = min(y_values) if y_values else self.default_y_range[0]
+        y_max = max(y_values) if y_values else self.default_y_range[1]
 
         # Add padding
         i3_range = max(i3_max - i3_min, 3)
@@ -153,7 +186,7 @@ class SubatomicEightfoldLayout:
             'x': plot_left,
             'y': plot_top - 20,
             'text': 'Baryon Octet & Decuplet',
-            'color': (102, 126, 234)
+            'color': self.baryon_color
         }
 
         return layout_data

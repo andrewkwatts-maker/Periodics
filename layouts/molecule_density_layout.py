@@ -11,6 +11,8 @@ import math
 from typing import List, Dict
 from core.molecule_enums import MoleculeCategory
 
+from data.layout_config_loader import get_molecule_config, get_layout_config
+
 
 class MoleculeDensityLayout:
     """Density-mass correlation scatter plot layout for molecules"""
@@ -18,11 +20,21 @@ class MoleculeDensityLayout:
     def __init__(self, widget_width: int, widget_height: int):
         self.widget_width = widget_width
         self.widget_height = widget_height
-        self.base_card_size = 100
-        self.min_card_size = 70
-        self.max_card_size = 130
-        self.padding = 80  # Extra padding for axis labels
+
+        # Load configuration from JSON
+        config = get_layout_config()
+        card_size = config.get_card_size('molecules')
+        margins = config.get_margins('molecules')
+
+        # Scatter plot card sizes based on config
+        self.base_card_size = card_size.get('width', 150) - 50
+        self.min_card_size = card_size.get('min_width', 120) - 50
+        self.max_card_size = card_size.get('max_width', 200) - 70
+        self.padding = margins.get('top', 80)  # Extra padding for axis labels
         self.axis_margin = 60
+
+        # Load category ordering from config
+        self.category_order = config.get_ordering('molecules', 'category')
 
     def calculate_layout(self, molecules: List[Dict]) -> List[Dict]:
         """
@@ -128,10 +140,11 @@ class MoleculeDensityLayout:
 
     def get_legend_info(self) -> List[Dict]:
         """Get legend information for category colors"""
+        # Use configured category order if available
+        categories = self.category_order if self.category_order else ['Organic', 'Inorganic']
         return [
-            {'name': 'Organic', 'color': MoleculeCategory.get_color('Organic')},
-            {'name': 'Inorganic', 'color': MoleculeCategory.get_color('Inorganic')},
-            {'name': 'Ionic', 'color': MoleculeCategory.get_color('Ionic')}
+            {'name': cat, 'color': MoleculeCategory.get_color(cat)}
+            for cat in categories
         ]
 
     def get_group_headers(self, molecules: List[Dict]) -> List[Dict]:

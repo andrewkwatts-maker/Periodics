@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt, QPointF, QRectF
 
 from layouts.quark_base_layout import QuarkBaseLayoutRenderer
 from core.quark_enums import ParticleType, QuarkProperty
+from data.layout_config_loader import get_quark_config, get_layout_config
 
 
 class QuarkCircularLayoutRenderer(QuarkBaseLayoutRenderer):
@@ -24,7 +25,19 @@ class QuarkCircularLayoutRenderer(QuarkBaseLayoutRenderer):
 
     def __init__(self, widget_width, widget_height):
         super().__init__(widget_width, widget_height)
-        self.cell_size = 60
+        # Load configuration values
+        config = get_layout_config()
+        card_size = config.get_card_size('quarks')
+
+        self.cell_size = card_size.get('default', 70) - 10  # Slightly smaller for circular
+
+        # Store size constraints from config
+        self.min_size = card_size.get('min', 45)
+        self.max_size = card_size.get('max', 120)
+
+        # Load ring radius ratios from config
+        circular_config = get_quark_config('circular', default={})
+        self.ring_ratios = circular_config.get('ring_radius_ratios', [0.25, 0.55, 0.85])
 
     def create_layout(self, particles, **kwargs):
         """
@@ -40,6 +53,9 @@ class QuarkCircularLayoutRenderer(QuarkBaseLayoutRenderer):
         center_x = self.widget_width / 2
         center_y = self.widget_height / 2
 
+        # Get margins from config
+        margins = get_layout_config().get_margins('quarks')
+
         # Categorize particles
         higgs = [p for p in particles if 'higgs' in p.get('Name', '').lower()]
         gauge_bosons = [p for p in particles
@@ -51,14 +67,14 @@ class QuarkCircularLayoutRenderer(QuarkBaseLayoutRenderer):
                  and p not in quarks and p not in leptons]
 
         # Calculate radii based on widget size
-        max_radius = min(self.widget_width, self.widget_height) / 2 - 60
-        self.cell_size = min(70, max_radius / 5)
+        max_radius = min(self.widget_width, self.widget_height) / 2 - margins.get('bottom', 50) - 10
+        self.cell_size = min(self.max_size - 10, max_radius / 5)
+        self.cell_size = max(self.min_size, self.cell_size)
 
-        # Ring radii
-        center_radius = 0
-        inner_radius = max_radius * 0.25
-        middle_radius = max_radius * 0.55
-        outer_radius = max_radius * 0.85
+        # Ring radii from config ratios
+        inner_radius = max_radius * self.ring_ratios[0]
+        middle_radius = max_radius * self.ring_ratios[1]
+        outer_radius = max_radius * self.ring_ratios[2]
 
         # Place Higgs at center
         for particle in higgs:

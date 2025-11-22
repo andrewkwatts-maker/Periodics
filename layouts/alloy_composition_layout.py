@@ -1,10 +1,13 @@
 """
 Alloy Composition Layout
 Arranges alloys grouped by their primary (base) element.
+
+Uses data-driven configuration from layout_config.json.
 """
 
 from typing import List, Dict
 from core.alloy_enums import get_element_color
+from data.layout_config_loader import get_alloy_config, get_layout_config
 
 
 class AlloyCompositionLayout:
@@ -13,12 +16,21 @@ class AlloyCompositionLayout:
     def __init__(self, widget_width: int, widget_height: int):
         self.widget_width = widget_width
         self.widget_height = widget_height
-        self.card_width = 160
-        self.card_height = 180
-        self.padding = 30
-        self.spacing = 15
-        self.group_spacing = 40
-        self.header_height = 45
+        self._load_config()
+
+    def _load_config(self):
+        """Load layout configuration from JSON."""
+        config = get_layout_config()
+        card_size = config.get_card_size('alloys')
+        spacing = config.get_spacing('alloys')
+        margins = config.get_margins('alloys')
+
+        self.card_width = card_size.get('width', 160)
+        self.card_height = card_size.get('height', 180)
+        self.padding = margins.get('left', 30)
+        self.spacing = spacing.get('card', 15)
+        self.group_spacing = spacing.get('group', 40)
+        self.header_height = spacing.get('header', 45)
 
     def calculate_layout(self, alloys: List[Dict]) -> List[Dict]:
         """
@@ -32,6 +44,9 @@ class AlloyCompositionLayout:
         """
         if not alloys:
             return []
+
+        # Reload config in case it changed
+        self._load_config()
 
         # Group alloys by primary element
         groups = {}
@@ -47,19 +62,21 @@ class AlloyCompositionLayout:
         # Sort elements by number of alloys (most common first)
         sorted_elements = sorted(groups.keys(), key=lambda e: -len(groups[e]))
 
-        # Element display names
-        element_names = {
-            'Fe': 'Iron-based',
-            'Al': 'Aluminum-based',
-            'Cu': 'Copper-based',
-            'Ti': 'Titanium-based',
-            'Ni': 'Nickel-based',
-            'Zn': 'Zinc-based',
-            'Sn': 'Tin-based',
-            'Ag': 'Silver-based',
-            'Au': 'Gold-based',
-            'Pb': 'Lead-based'
-        }
+        # Get element display names from config
+        element_names = get_alloy_config('element_display_names', default={})
+        if not element_names:
+            element_names = {
+                'Fe': 'Iron-based',
+                'Al': 'Aluminum-based',
+                'Cu': 'Copper-based',
+                'Ti': 'Titanium-based',
+                'Ni': 'Nickel-based',
+                'Zn': 'Zinc-based',
+                'Sn': 'Tin-based',
+                'Ag': 'Silver-based',
+                'Au': 'Gold-based',
+                'Pb': 'Lead-based'
+            }
 
         for element in sorted_elements:
             group_alloys = groups.get(element, [])

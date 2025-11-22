@@ -9,6 +9,8 @@ Shows relationship between dipole moment and polarity classification.
 from typing import List, Dict
 from core.molecule_enums import MoleculePolarity
 
+from data.layout_config_loader import get_molecule_config, get_layout_config
+
 
 class MoleculeDipoleLayout:
     """Dipole moment grouped by polarity layout for molecules"""
@@ -16,13 +18,24 @@ class MoleculeDipoleLayout:
     def __init__(self, widget_width: int, widget_height: int):
         self.widget_width = widget_width
         self.widget_height = widget_height
-        self.card_width = 130
-        self.card_height = 150
-        self.padding = 40
-        self.spacing = 15
-        self.group_spacing = 50
-        self.header_height = 45
+
+        # Load configuration from JSON
+        config = get_layout_config()
+        card_size = config.get_card_size('molecules')
+        spacing = config.get_spacing('molecules')
+        margins = config.get_margins('molecules')
+
+        # Slightly smaller cards for dipole chart
+        self.card_width = card_size.get('width', 150) - 20
+        self.card_height = card_size.get('height', 170) - 20
+        self.padding = margins.get('top', 80) - 40
+        self.spacing = spacing.get('card', 15)
+        self.group_spacing = spacing.get('group', 40) + 10
+        self.header_height = spacing.get('header', 40) + 5
         self.axis_height = 50  # Space for dipole moment axis
+
+        # Load polarity ordering from config
+        self.polarity_order = config.get_ordering('molecules', 'polarity')
 
     def calculate_layout(self, molecules: List[Dict]) -> List[Dict]:
         """
@@ -68,8 +81,13 @@ class MoleculeDipoleLayout:
         positioned_molecules = []
         current_y = self.padding + self.axis_height
 
-        # Order of groups (showing polarity relationship)
-        group_order = ['Nonpolar', 'Polar', 'Ionic']
+        # Build group order: start with Nonpolar, then use config order
+        group_order = ['Nonpolar']
+        for pol in self.polarity_order:
+            if pol not in group_order:
+                group_order.append(pol)
+        if 'Ionic' not in group_order:
+            group_order.append('Ionic')
 
         for group_name in group_order:
             group_mols = groups.get(group_name, [])

@@ -1,7 +1,11 @@
 """
 Mass Order Layout Renderer for Subatomic Particles
 Displays all particles ordered by their mass
+
+Uses data-driven configuration from layout_config.json
 """
+
+from data.layout_config_loader import get_subatomic_config, get_layout_config
 
 
 class SubatomicMassLayout:
@@ -10,10 +14,30 @@ class SubatomicMassLayout:
     def __init__(self, widget_width, widget_height):
         self.widget_width = widget_width
         self.widget_height = widget_height
-        self.card_width = 140
-        self.card_height = 180
-        self.card_spacing = 20
-        self.header_height = 40
+        self._load_config()
+
+    def _load_config(self):
+        """Load configuration from JSON config file"""
+        config = get_layout_config()
+        card_size = config.get_card_size('subatomic')
+        spacing = config.get_spacing('subatomic')
+        margins = config.get_margins('subatomic')
+
+        self.card_width = card_size.get('width', 140)
+        self.card_height = card_size.get('height', 180)
+        self.card_spacing = spacing.get('card', 20)
+        self.header_height = spacing.get('header', 40)
+        self.margin_left = margins.get('left', 50)
+        self.margin_right = margins.get('right', 50)
+        self.margin_top = margins.get('top', 100)
+
+        # Mass ranges from config
+        self.mass_ranges = get_subatomic_config('mass_ranges', default=[
+            {'min': 0, 'max': 200, 'label': 'Light (< 200 MeV)'},
+            {'min': 200, 'max': 1000, 'label': 'Medium (200-1000 MeV)'},
+            {'min': 1000, 'max': 2000, 'label': 'Heavy (1-2 GeV)'},
+            {'min': 2000, 'max': float('inf'), 'label': 'Very Heavy (> 2 GeV)'}
+        ])
 
     def calculate_layout(self, particles):
         """
@@ -28,10 +52,10 @@ class SubatomicMassLayout:
         layout_data = {}
 
         y_offset = self.header_height + 20
-        x_start = 50
+        x_start = self.margin_left
 
         # Calculate columns
-        available_width = self.widget_width - 100
+        available_width = self.widget_width - self.margin_left - self.margin_right
         cols = max(1, available_width // (self.card_width + self.card_spacing))
 
         # Header
@@ -48,8 +72,11 @@ class SubatomicMassLayout:
         # Sort by mass
         sorted_particles = sorted(particles, key=lambda p: p.get('Mass_MeVc2', 0))
 
-        # Add mass scale markers
+        # Add mass scale markers from config
         mass_ranges = [
+            (r.get('min', 0), r.get('max', float('inf')), r.get('label', ''))
+            for r in self.mass_ranges
+        ] if isinstance(self.mass_ranges, list) else [
             (0, 200, 'Light (< 200 MeV)'),
             (200, 1000, 'Medium (200-1000 MeV)'),
             (1000, 2000, 'Heavy (1-2 GeV)'),
@@ -86,14 +113,14 @@ class SubatomicMassLayout:
 
     def get_content_height(self, particles):
         """Calculate total content height"""
-        available_width = self.widget_width - 100
+        available_width = self.widget_width - self.margin_left - self.margin_right
         cols = max(1, available_width // (self.card_width + self.card_spacing))
 
         rows = (len(particles) + cols - 1) // cols
         height = self.header_height * 2 + 20
         height += rows * (self.card_height + self.card_spacing)
 
-        return height + 50
+        return height + self.margin_left
 
     def update_dimensions(self, width, height):
         """Update layout dimensions"""

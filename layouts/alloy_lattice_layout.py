@@ -1,10 +1,13 @@
 """
 Alloy Lattice Layout
 Arranges alloys grouped by their crystal structure (FCC, BCC, HCP, etc.).
+
+Uses data-driven configuration from layout_config.json.
 """
 
 from typing import List, Dict
 from core.alloy_enums import CrystalStructure
+from data.layout_config_loader import get_alloy_config, get_layout_config
 
 
 class AlloyLatticeLayout:
@@ -13,12 +16,21 @@ class AlloyLatticeLayout:
     def __init__(self, widget_width: int, widget_height: int):
         self.widget_width = widget_width
         self.widget_height = widget_height
-        self.card_width = 160
-        self.card_height = 180
-        self.padding = 30
-        self.spacing = 15
-        self.group_spacing = 50
-        self.header_height = 55  # Extra height for structure description
+        self._load_config()
+
+    def _load_config(self):
+        """Load layout configuration from JSON."""
+        config = get_layout_config()
+        card_size = config.get_card_size('alloys')
+        spacing = config.get_spacing('alloys')
+        margins = config.get_margins('alloys')
+
+        self.card_width = card_size.get('width', 160)
+        self.card_height = card_size.get('height', 180)
+        self.padding = margins.get('left', 30)
+        self.spacing = spacing.get('card', 15)
+        self.group_spacing = spacing.get('group', 40) + 10  # Extra spacing for structure descriptions
+        self.header_height = spacing.get('header', 45) + 10  # Extra height for structure description
 
     def calculate_layout(self, alloys: List[Dict]) -> List[Dict]:
         """
@@ -33,6 +45,9 @@ class AlloyLatticeLayout:
         if not alloys:
             return []
 
+        # Reload config in case it changed
+        self._load_config()
+
         # Group alloys by crystal structure
         groups = {}
         for alloy in alloys:
@@ -44,13 +59,26 @@ class AlloyLatticeLayout:
         positioned_alloys = []
         current_y = self.padding
 
-        # Sort structures by predefined order (most common first)
-        structure_order = ['FCC', 'BCC', 'HCP', 'BCT', 'Mixed', 'Unknown']
+        # Get structure order from config
+        structure_order = get_layout_config().get_ordering('alloys', 'crystal_structure')
+        if not structure_order:
+            structure_order = ['FCC', 'BCC', 'HCP', 'BCT', 'Mixed', 'Unknown']
 
         # Add any structures not in the predefined order
         for struct in sorted(groups.keys()):
             if struct not in structure_order:
-                structure_order.insert(-1, struct)  # Before Unknown
+                # Insert before 'Unknown' or 'Other' if present
+                if 'Unknown' in structure_order:
+                    idx = structure_order.index('Unknown')
+                    structure_order.insert(idx, struct)
+                elif 'Other' in structure_order:
+                    idx = structure_order.index('Other')
+                    structure_order.insert(idx, struct)
+                else:
+                    structure_order.append(struct)
+
+        # Get structure descriptions from config
+        structure_descriptions = get_alloy_config('structure_descriptions', default={})
 
         for structure in structure_order:
             group_alloys = groups.get(structure, [])
@@ -58,7 +86,10 @@ class AlloyLatticeLayout:
                 continue
 
             group_color = CrystalStructure.get_color(structure)
-            description = CrystalStructure.get_description(structure)
+            # Try config description first, then fall back to enum
+            description = structure_descriptions.get(structure)
+            if not description:
+                description = CrystalStructure.get_description(structure)
 
             # Calculate cards per row
             available_width = self.widget_width - 2 * self.padding

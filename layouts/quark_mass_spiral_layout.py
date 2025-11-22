@@ -11,6 +11,7 @@ from PySide6.QtCore import Qt, QPointF, QRectF
 
 from layouts.quark_base_layout import QuarkBaseLayoutRenderer
 from core.quark_enums import ParticleType, QuarkGeneration
+from data.layout_config_loader import get_quark_config, get_layout_config
 
 
 class QuarkMassSpiralLayoutRenderer(QuarkBaseLayoutRenderer):
@@ -23,7 +24,22 @@ class QuarkMassSpiralLayoutRenderer(QuarkBaseLayoutRenderer):
 
     def __init__(self, widget_width, widget_height):
         super().__init__(widget_width, widget_height)
-        self.base_cell_size = 50
+        # Load configuration values
+        config = get_layout_config()
+        card_size = config.get_card_size('quarks')
+
+        self.base_cell_size = card_size.get('default', 70) - 20
+
+        # Store size constraints from config
+        self.min_size = card_size.get('min', 45)
+        self.max_size = card_size.get('max', 120)
+
+        # Load mass spiral configuration
+        spiral_config = get_quark_config('mass_spiral', default={})
+        self.min_radius_ratio = spiral_config.get('min_radius_ratio', 0.15)
+        self.max_radius_ratio = spiral_config.get('max_radius_ratio', 0.85)
+        self.angular_spread_deg = spiral_config.get('angular_spread_deg', 60)
+        self.angular_spread = math.radians(self.angular_spread_deg)
 
     def create_layout(self, particles, **kwargs):
         """
@@ -36,11 +52,14 @@ class QuarkMassSpiralLayoutRenderer(QuarkBaseLayoutRenderer):
         Returns:
             List of particles with layout positions
         """
+        # Get margins from config
+        margins = get_layout_config().get_margins('quarks')
+
         center_x = self.widget_width / 2
         center_y = self.widget_height / 2
 
         # Calculate max radius available
-        max_radius = min(self.widget_width, self.widget_height) / 2 - 80
+        max_radius = min(self.widget_width, self.widget_height) / 2 - margins.get('bottom', 50) - 30
 
         # Find mass range for normalization
         masses = [p.get('Mass_MeVc2', 0) or 0.001 for p in particles]
@@ -92,7 +111,6 @@ class QuarkMassSpiralLayoutRenderer(QuarkBaseLayoutRenderer):
 
             base_angle = gen_base_angles[gen]
             n = len(group_particles)
-            angular_spread = math.pi / 3  # 60 degrees spread within each generation
 
             # Sort by mass within generation
             group_particles.sort(key=lambda p: p.get('Mass_MeVc2', 0) or 0)
@@ -102,16 +120,16 @@ class QuarkMassSpiralLayoutRenderer(QuarkBaseLayoutRenderer):
                 mass = particle.get('Mass_MeVc2', 0) or 0.001
                 log_mass = math.log10(max(0.001, mass))
 
-                # Normalize to [0.15, 1] range for radius
+                # Normalize to [min_radius_ratio, max_radius_ratio] range for radius
                 if log_max > log_min:
                     norm_mass = (log_mass - log_min) / (log_max - log_min)
                 else:
                     norm_mass = 0.5
-                radius = max_radius * (0.15 + 0.85 * norm_mass)
+                radius = max_radius * (self.min_radius_ratio + (self.max_radius_ratio - self.min_radius_ratio) * norm_mass)
 
                 # Calculate angle within generation sector
                 if n > 1:
-                    angle_offset = (i / (n - 1) - 0.5) * angular_spread
+                    angle_offset = (i / (n - 1) - 0.5) * self.angular_spread
                 else:
                     angle_offset = 0
                 angle = base_angle + angle_offset
@@ -165,7 +183,9 @@ class QuarkMassSpiralLayoutRenderer(QuarkBaseLayoutRenderer):
 
     def _draw_spiral_guides(self, painter, center_x, center_y, particles):
         """Draw logarithmic spiral guide lines"""
-        max_radius = min(self.widget_width, self.widget_height) / 2 - 80
+        # Get margins from config
+        margins = get_layout_config().get_margins('quarks')
+        max_radius = min(self.widget_width, self.widget_height) / 2 - margins.get('bottom', 50) - 30
 
         # Draw concentric circles for mass scale
         painter.setPen(QPen(QColor(60, 60, 80, 80), 1, Qt.PenStyle.DotLine))
@@ -176,7 +196,7 @@ class QuarkMassSpiralLayoutRenderer(QuarkBaseLayoutRenderer):
             log_mass = math.log10(mass)
             # Normalize (assuming typical particle mass range)
             norm = (log_mass + 3) / 8  # -3 to 5 range
-            if 0.15 <= norm <= 1.0:
+            if self.min_radius_ratio <= norm <= 1.0:
                 radius = max_radius * norm
                 painter.drawEllipse(QPointF(center_x, center_y), radius, radius)
 
@@ -189,7 +209,9 @@ class QuarkMassSpiralLayoutRenderer(QuarkBaseLayoutRenderer):
 
     def _draw_generation_sectors(self, painter, center_x, center_y):
         """Draw generation sector labels"""
-        max_radius = min(self.widget_width, self.widget_height) / 2 - 80
+        # Get margins from config
+        margins = get_layout_config().get_margins('quarks')
+        max_radius = min(self.widget_width, self.widget_height) / 2 - margins.get('bottom', 50) - 30
 
         gen_info = [
             (0, -math.pi / 2, "Bosons", QColor(180, 100, 230)),
@@ -219,8 +241,11 @@ class QuarkMassSpiralLayoutRenderer(QuarkBaseLayoutRenderer):
 
     def _draw_legend(self, painter, center_x, center_y):
         """Draw legend explaining the spiral"""
-        legend_x = 20
-        legend_y = self.widget_height - 120
+        # Get margins from config
+        margins = get_layout_config().get_margins('quarks')
+
+        legend_x = margins.get('left', 50) - 30
+        legend_y = self.widget_height - margins.get('bottom', 50) - 70
 
         font = QFont('Arial', 10, QFont.Weight.Bold)
         painter.setFont(font)

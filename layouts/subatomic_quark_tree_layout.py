@@ -5,9 +5,13 @@ Root: fundamental quarks
 Level 2: simple hadrons (u,d combinations)
 Level 3: strange hadrons
 Level 4: heavy hadrons (charm, bottom)
+
+Uses data-driven configuration from layout_config.json
 """
 
 import math
+
+from data.layout_config_loader import get_subatomic_config, get_layout_config
 
 
 class SubatomicQuarkTreeLayout:
@@ -16,11 +20,46 @@ class SubatomicQuarkTreeLayout:
     def __init__(self, widget_width, widget_height):
         self.widget_width = widget_width
         self.widget_height = widget_height
-        self.card_width = 130
-        self.card_height = 160
-        self.card_spacing = 20
-        self.level_spacing = 220  # Vertical space between tree levels
-        self.header_height = 40
+        self._load_config()
+
+    def _load_config(self):
+        """Load configuration from JSON config file"""
+        config = get_layout_config()
+        card_size = config.get_card_size('subatomic')
+        spacing = config.get_spacing('subatomic')
+        margins = config.get_margins('subatomic')
+
+        # Slightly smaller cards for tree view
+        self.card_width = int(card_size.get('width', 140) * 0.93)
+        self.card_height = int(card_size.get('height', 180) * 0.89)
+        self.card_spacing = spacing.get('card', 20)
+        self.header_height = spacing.get('header', 40)
+        self.margin_left = margins.get('left', 50)
+        self.margin_right = margins.get('right', 50)
+
+        # Tree-specific spacing from config
+        tree_config = get_subatomic_config('tree', default={})
+        self.level_spacing = tree_config.get('level_spacing', 220)
+
+        # Colors from config
+        color_scheme = config.get_color_scheme('subatomic')
+        self.baryon_color = self._hex_to_rgb(color_scheme.get('baryon', '#667EEA'))
+        self.meson_color = self._hex_to_rgb(color_scheme.get('meson', '#F093FB'))
+
+        # Tree level colors (can be configured)
+        self.level_colors = get_subatomic_config('tree_level_colors', default={
+            'light': (255, 100, 100),
+            'strange': (100, 255, 100),
+            'charm': (255, 200, 100),
+            'bottom': (200, 100, 255)
+        })
+
+    def _hex_to_rgb(self, hex_color):
+        """Convert hex color to RGB tuple"""
+        if isinstance(hex_color, tuple):
+            return hex_color
+        hex_color = hex_color.lstrip('#')
+        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
     def calculate_layout(self, particles):
         """
@@ -46,7 +85,7 @@ class SubatomicQuarkTreeLayout:
         # Header
         layout_data['_quark_tree_header'] = {
             'type': 'header',
-            'x': 50,
+            'x': self.margin_left,
             'y': y_start,
             'text': 'QUARK COMPOSITION TREE',
             'subtitle': 'Hierarchical view from light to heavy quark content',
@@ -83,15 +122,24 @@ class SubatomicQuarkTreeLayout:
         # Track tree connections for rendering
         tree_connections = []
 
+        # Get level color from config
+        def get_level_color(level_name):
+            if isinstance(self.level_colors, dict):
+                color = self.level_colors.get(level_name, (150, 150, 150))
+                if isinstance(color, str):
+                    return self._hex_to_rgb(color)
+                return color
+            return (150, 150, 150)
+
         # Level 1: Light hadrons (u, d only) - at the top after header
         y_level1 = y_start + self.header_height + 60
 
         layout_data['_light_level_header'] = {
             'type': 'level_header',
-            'x': 50,
+            'x': self.margin_left,
             'y': y_level1,
             'text': 'LIGHT HADRONS (u, d quarks)',
-            'color': (255, 100, 100),
+            'color': get_level_color('light'),
             'level': 1
         }
         y_level1 += 40
@@ -103,10 +151,10 @@ class SubatomicQuarkTreeLayout:
 
         layout_data['_strange_level_header'] = {
             'type': 'level_header',
-            'x': 50,
+            'x': self.margin_left,
             'y': y_level2,
             'text': 'STRANGE HADRONS (contains s quark)',
-            'color': (100, 255, 100),
+            'color': get_level_color('strange'),
             'level': 2
         }
         y_level2 += 40
@@ -132,10 +180,10 @@ class SubatomicQuarkTreeLayout:
 
         layout_data['_charm_level_header'] = {
             'type': 'level_header',
-            'x': 50,
+            'x': self.margin_left,
             'y': y_level3,
             'text': 'CHARM HADRONS (contains c quark)',
-            'color': (255, 200, 100),
+            'color': get_level_color('charm'),
             'level': 3
         }
         y_level3 += 40
@@ -157,10 +205,10 @@ class SubatomicQuarkTreeLayout:
 
         layout_data['_bottom_level_header'] = {
             'type': 'level_header',
-            'x': 50,
+            'x': self.margin_left,
             'y': y_level4,
             'text': 'BOTTOM HADRONS (contains b quark)',
-            'color': (200, 100, 255),
+            'color': get_level_color('bottom'),
             'level': 4
         }
         y_level4 += 40
@@ -212,9 +260,9 @@ class SubatomicQuarkTreeLayout:
         mesons.sort(key=lambda p: p.get('Mass_MeVc2', 0))
 
         # Layout baryons on left, mesons on right
-        x_start = 50
+        x_start = self.margin_left
         total_particles = len(particles)
-        available_width = self.widget_width - 100
+        available_width = self.widget_width - self.margin_left - self.margin_right
         cols = max(1, available_width // (self.card_width + self.card_spacing))
 
         # Position baryons
@@ -265,7 +313,7 @@ class SubatomicQuarkTreeLayout:
         if not particles:
             return 0
 
-        available_width = self.widget_width - 100
+        available_width = self.widget_width - self.margin_left - self.margin_right
         cols = max(1, available_width // (self.card_width + self.card_spacing))
         rows = (len(particles) + cols - 1) // cols
 
@@ -305,7 +353,7 @@ class SubatomicQuarkTreeLayout:
         height += self._get_level_height(light_hadrons) + self.level_spacing + 40
         height += self._get_level_height(strange_hadrons) + self.level_spacing + 40
         height += self._get_level_height(charm_hadrons) + self.level_spacing + 40
-        height += self._get_level_height(bottom_hadrons) + 50
+        height += self._get_level_height(bottom_hadrons) + self.margin_left
 
         return max(height, 800)
 

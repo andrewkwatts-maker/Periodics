@@ -1,0 +1,214 @@
+{
+  "version": "1.0",
+  "description": "Global layout configuration for all particle/element visualizations",
+
+  "global": {
+    "min_card_size": 40,
+    "max_card_size": 200,
+    "default_spacing": 15,
+    "default_padding": 30,
+    "default_margin": 50,
+    "animation_duration_ms": 200,
+    "responsive_scaling": true,
+    "scale_factor_range": [0.5, 2.0]
+  },
+
+  "quarks": {
+    "card_size": {
+      "min": 45,
+      "max": 120,
+      "default": 70
+    },
+    "spacing": {
+      "cell": 10,
+      "section": 30,
+      "group": 40
+    },
+    "margins": {
+      "top": 100,
+      "right": 50,
+      "bottom": 50,
+      "left": 50
+    },
+    "standard_model": {
+      "row_count": 4,
+      "col_count": 6,
+      "fermion_cols": 3,
+      "boson_cols": 3
+    },
+    "circular": {
+      "ring_radius_ratios": [0.25, 0.55, 0.85],
+      "generation_angles": {
+        "1": 0,
+        "2": 120,
+        "3": 240
+      }
+    },
+    "mass_spiral": {
+      "min_radius_ratio": 0.15,
+      "max_radius_ratio": 0.85,
+      "angular_spread_deg": 60
+    },
+    "force_network": {
+      "cluster_positions": {
+        "strong": [0.25, 0.3],
+        "electromagnetic": [0.75, 0.3],
+        "weak": [0.5, 0.7],
+        "gravitational": [0.5, 0.5]
+      }
+    },
+    "classification_order": ["Quark", "Lepton", "Boson"],
+    "generation_order": [1, 2, 3],
+    "charge_types": ["positive", "negative", "neutral"]
+  },
+
+  "subatomic": {
+    "card_size": {
+      "width": 140,
+      "height": 180,
+      "min_width": 100,
+      "max_width": 200
+    },
+    "spacing": {
+      "card": 20,
+      "section": 60,
+      "header": 40
+    },
+    "margins": {
+      "top": 100,
+      "right": 50,
+      "bottom": 50,
+      "left": 50
+    },
+    "eightfold": {
+      "plot_margin": 100,
+      "isospin_range": [-1.5, 1.5],
+      "strangeness_range": [-3, 0]
+    },
+    "stability_thresholds": {
+      "stable": null,
+      "long_lived": 1e-6,
+      "short_lived": 1e-12,
+      "very_short": 1e-20
+    },
+    "particle_type_order": ["Baryon", "Meson"],
+    "charge_order": [2, 1, 0, -1, -2],
+    "stability_order": ["Stable", "Long-lived", "Short-lived", "Very short-lived"]
+  },
+
+  "molecules": {
+    "card_size": {
+      "width": 150,
+      "height": 170,
+      "min_width": 120,
+      "max_width": 200
+    },
+    "spacing": {
+      "card": 15,
+      "group": 40,
+      "header": 40
+    },
+    "margins": {
+      "top": 80,
+      "right": 30,
+      "bottom": 30,
+      "left": 30
+    },
+    "mass_scaling": {
+      "min_scale": 1.0,
+      "max_scale": 1.5,
+      "base_width": 120,
+      "base_height": 140
+    },
+    "geometry_order": [
+      "Linear", "Bent", "Trigonal Planar", "Trigonal Pyramidal",
+      "Tetrahedral", "Square Planar", "Octahedral", "Complex"
+    ],
+    "bond_type_order": ["Ionic", "Polar Covalent", "Nonpolar Covalent", "Covalent"],
+    "polarity_order": ["Polar", "Nonpolar"],
+    "state_order": ["Solid", "Liquid", "Gas"],
+    "category_order": ["Organic", "Inorganic"]
+  },
+
+  "alloys": {
+    "card_size": {
+      "width": 160,
+      "height": 180,
+      "min_width": 120,
+      "max_width": 220
+    },
+    "spacing": {
+      "card": 15,
+      "group": 40,
+      "header": 45
+    },
+    "margins": {
+      "top": 80,
+      "right": 30,
+      "bottom": 30,
+      "left": 30
+    },
+    "scatter_plot": {
+      "card_size": 60,
+      "axis_padding": 60,
+      "plot_padding": 80
+    },
+    "category_order": [
+      "Steel", "Aluminum", "Bronze", "Brass", "Copper",
+      "Titanium", "Nickel", "Superalloy", "Precious", "Solder", "Other"
+    ],
+    "crystal_structure_order": ["FCC", "BCC", "HCP", "BCT", "Diamond", "Other"],
+    "element_display_names": {
+      "Fe": "Iron-based",
+      "Al": "Aluminum-based",
+      "Cu": "Copper-based",
+      "Ti": "Titanium-based",
+      "Ni": "Nickel-based",
+      "Zn": "Zinc-based",
+      "Sn": "Tin-based",
+      "Ag": "Silver-based",
+      "Au": "Gold-based",
+      "Pb": "Lead-based"
+    },
+    "structure_descriptions": {
+      "FCC": "Face-Centered Cubic",
+      "BCC": "Body-Centered Cubic",
+      "HCP": "Hexagonal Close-Packed",
+      "BCT": "Body-Centered Tetragonal"
+    }
+  },
+
+  "color_schemes": {
+    "quarks": {
+      "up": "#FF6B6B",
+      "down": "#4ECDC4",
+      "charm": "#FFE66D",
+      "strange": "#95E1D3",
+      "top": "#F38181",
+      "bottom": "#AA96DA",
+      "electron": "#74B9FF",
+      "neutrino": "#A29BFE",
+      "boson": "#FD79A8"
+    },
+    "subatomic": {
+      "baryon": "#667EEA",
+      "meson": "#F093FB",
+      "stable": "#00B894",
+      "unstable": "#E17055"
+    },
+    "molecules": {
+      "polar": "#74B9FF",
+      "nonpolar": "#FDCB6E",
+      "solid": "#636E72",
+      "liquid": "#0984E3",
+      "gas": "#00CEC9"
+    },
+    "alloys": {
+      "steel": "#C0C0C0",
+      "aluminum": "#E8E8E8",
+      "copper": "#B87333",
+      "titanium": "#8E8E8E",
+      "brass": "#D4AF37"
+    }
+  }
+}

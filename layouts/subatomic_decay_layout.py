@@ -1,7 +1,11 @@
 """
 Decay Chain Layout Renderer for Subatomic Particles
 Displays particles ordered by stability with decay relationship arrows
+
+Uses data-driven configuration from layout_config.json
 """
+
+from data.layout_config_loader import get_subatomic_config, get_layout_config
 
 
 class SubatomicDecayLayout:
@@ -10,11 +14,49 @@ class SubatomicDecayLayout:
     def __init__(self, widget_width, widget_height):
         self.widget_width = widget_width
         self.widget_height = widget_height
-        self.card_width = 140
-        self.card_height = 180
-        self.card_spacing = 30  # More spacing for arrows
-        self.section_spacing = 60
-        self.header_height = 40
+        self._load_config()
+
+    def _load_config(self):
+        """Load configuration from JSON config file"""
+        config = get_layout_config()
+        card_size = config.get_card_size('subatomic')
+        spacing = config.get_spacing('subatomic')
+        margins = config.get_margins('subatomic')
+
+        self.card_width = card_size.get('width', 140)
+        self.card_height = card_size.get('height', 180)
+        # Use slightly larger spacing for arrows
+        base_spacing = spacing.get('card', 20)
+        self.card_spacing = base_spacing + 10
+        self.section_spacing = spacing.get('section', 60)
+        self.header_height = spacing.get('header', 40)
+        self.margin_left = margins.get('left', 50)
+        self.margin_right = margins.get('right', 50)
+
+        # Stability thresholds from config
+        self.stability_thresholds = get_subatomic_config('stability_thresholds', default={
+            'stable': None,
+            'long_lived': 1e-6,
+            'short_lived': 1e-12,
+            'very_short': 1e-20
+        })
+
+        # Stability order from config
+        self.stability_order = config.get_ordering('subatomic', 'stability') or [
+            'Stable', 'Long-lived', 'Short-lived', 'Very short-lived'
+        ]
+
+        # Colors from config color scheme
+        color_scheme = config.get_color_scheme('subatomic')
+        self.stable_color = self._hex_to_rgb(color_scheme.get('stable', '#00B894'))
+        self.unstable_color = self._hex_to_rgb(color_scheme.get('unstable', '#E17055'))
+
+    def _hex_to_rgb(self, hex_color):
+        """Convert hex color to RGB tuple"""
+        if isinstance(hex_color, tuple):
+            return hex_color
+        hex_color = hex_color.lstrip('#')
+        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
     def calculate_layout(self, particles):
         """
@@ -29,10 +71,10 @@ class SubatomicDecayLayout:
         layout_data = {}
 
         y_offset = self.header_height + 20
-        x_start = 50
+        x_start = self.margin_left
 
         # Calculate columns
-        available_width = self.widget_width - 100
+        available_width = self.widget_width - self.margin_left - self.margin_right
         cols = max(1, available_width // (self.card_width + self.card_spacing))
 
         # Header
@@ -49,12 +91,20 @@ class SubatomicDecayLayout:
         # Sort by stability factor (most stable first)
         sorted_particles = sorted(particles, key=lambda p: -p.get('_stability_factor', 0))
 
-        # Group by stability ranges
+        # Get thresholds from config
+        long_lived_threshold = self.stability_thresholds.get('long_lived', 1e-6)
+        short_lived_threshold = self.stability_thresholds.get('short_lived', 1e-12)
+
+        # Group by stability ranges using config thresholds
         stability_groups = [
-            ('stable', 'Stable Particles', (100, 255, 100), lambda p: p.get('Stability') == 'Stable'),
-            ('long', 'Long-lived (> 1 ns)', (200, 255, 100), lambda p: p.get('Stability') != 'Stable' and p.get('HalfLife_s', 0) and p.get('HalfLife_s', 0) > 1e-9),
-            ('medium', 'Medium (1 ps - 1 ns)', (255, 255, 100), lambda p: p.get('HalfLife_s', 0) and 1e-12 <= p.get('HalfLife_s', 0) <= 1e-9),
-            ('short', 'Short-lived (< 1 ps)', (255, 150, 100), lambda p: p.get('HalfLife_s', 0) and p.get('HalfLife_s', 0) < 1e-12),
+            ('stable', 'Stable Particles', (100, 255, 100),
+             lambda p: p.get('Stability') == 'Stable'),
+            ('long', f'Long-lived (> {self._format_time(long_lived_threshold)})', (200, 255, 100),
+             lambda p: p.get('Stability') != 'Stable' and p.get('HalfLife_s', 0) and p.get('HalfLife_s', 0) > long_lived_threshold),
+            ('medium', f'Medium ({self._format_time(short_lived_threshold)} - {self._format_time(long_lived_threshold)})', (255, 255, 100),
+             lambda p: p.get('HalfLife_s', 0) and short_lived_threshold <= p.get('HalfLife_s', 0) <= long_lived_threshold),
+            ('short', f'Short-lived (< {self._format_time(short_lived_threshold)})', (255, 150, 100),
+             lambda p: p.get('HalfLife_s', 0) and p.get('HalfLife_s', 0) < short_lived_threshold),
         ]
 
         decay_arrows = []
@@ -110,6 +160,22 @@ class SubatomicDecayLayout:
 
         return layout_data
 
+    def _format_time(self, seconds):
+        """Format time in appropriate units"""
+        if seconds is None:
+            return 'stable'
+        if seconds >= 1:
+            return f'{seconds:.0f} s'
+        if seconds >= 1e-3:
+            return f'{seconds * 1e3:.0f} ms'
+        if seconds >= 1e-6:
+            return f'{seconds * 1e6:.0f} us'
+        if seconds >= 1e-9:
+            return f'{seconds * 1e9:.0f} ns'
+        if seconds >= 1e-12:
+            return f'{seconds * 1e12:.0f} ps'
+        return f'{seconds * 1e15:.0f} fs'
+
     def get_decay_arrows(self, layout_data):
         """Get list of decay arrows to draw"""
         arrows_data = layout_data.get('_decay_arrows', {})
@@ -117,7 +183,7 @@ class SubatomicDecayLayout:
 
     def get_content_height(self, particles):
         """Calculate total content height"""
-        available_width = self.widget_width - 100
+        available_width = self.widget_width - self.margin_left - self.margin_right
         cols = max(1, available_width // (self.card_width + self.card_spacing))
 
         # Estimate based on number of particles
@@ -127,7 +193,7 @@ class SubatomicDecayLayout:
         height += rows * (self.card_height + self.card_spacing)
         height += self.section_spacing * 4
 
-        return height + 50
+        return height + self.margin_left
 
     def update_dimensions(self, width, height):
         """Update layout dimensions"""
